@@ -1,5 +1,4 @@
-// win32项目.cpp : 定义应用程序的入口点。
-//
+
 
 #include "stdafx.h"
 #include "win32项目.h"
@@ -8,7 +7,6 @@
 
 // 全局变量: 
 HINSTANCE hInst;                                // 当前实例
-HWND hWnd;
 WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 
@@ -21,205 +19,9 @@ INT_PTR CALLBACK    NewWin(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    Calculator(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    ComboxTest(HWND, UINT, WPARAM, LPARAM);
 
-int ComboxInit(void);
-
-HANDLE Robocon_com;
-
-HANDLE hCom; //全局变量，串口句柄
-
-/**************************************************************
-*   串口通信
-*   包含初始化函数，接收函数，发送函数
-*   仅写了字符发送和接收，需要可以增加单字节发送和接收
-*   通过宏SERIAL_COM修改使用COM口,SERIAL_BOUD 修改波特率
-*   默认：COM口：com5 波特率:115200 数据位：8 停止位：1 校验：无
-*   环境：VS2010
-//-------------------- -
-//作者：灰同学
-//来源：CSDN
-//原文：https ://blog.csdn.net/zat907943815/article/details/53256434
-//版权声明：本文为博主原创文章，转载请附上博文链接！
-***************************************************************/
-
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <windows.h>
-#include <winbase.h>
-int Serial_Init(LPCWSTR COMx, int BaudRate)
-{
-	DCB com_dcb;    //参数设置
-	COMMTIMEOUTS tim_out;
-
-	Robocon_com = CreateFile(COMx, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
-
-	if (Robocon_com == (HANDLE)-1)
-	{
-		/*printf("Serial open fail\n");*/
-		MessageBox(hWnd, TEXT("Serial open fail\n"), MB_OK, TRUE);
-		return -1;
-	}
-
-	if (GetCommState(Robocon_com, &com_dcb))//获取COM状态，配置参数
-	{
-		com_dcb.BaudRate = BaudRate;//波特率
-		com_dcb.fBinary = TRUE;		// 设置二进制模式，此处必须设置TRUE 
-		com_dcb.fParity = FALSE;	// 支持奇偶校验
-		com_dcb.fOutxCtsFlow = FALSE;// No CTS output flow control
-		com_dcb.fOutxDsrFlow = FALSE;// No DSR output flow control
-		com_dcb.fDtrControl = DTR_CONTROL_DISABLE;// No DTR flow control
-		com_dcb.fDsrSensitivity = FALSE;// DSR sensitivity 
-		com_dcb.fTXContinueOnXoff = TRUE;// XOFF continues Tx
-		com_dcb.fOutX = FALSE;// No XON/XOFF out flow control
-		com_dcb.fInX = FALSE;// No XON/XOFF in flow control
-		com_dcb.fErrorChar = FALSE;// Disable error replacement
-		com_dcb.fNull = FALSE;// Disable null stripping
-		com_dcb.fRtsControl = RTS_CONTROL_DISABLE;//No RTS flow control
-		com_dcb.fAbortOnError = FALSE;// 当串口发生错误，并不终止串口读写 
-		com_dcb.ByteSize = 8;     //数据位,范围:4-8 
-		com_dcb.Parity = NOPARITY;//校验位
-		com_dcb.StopBits = ONESTOPBIT;     //停止位
-		//com_dcb.fBinary = TRUE;
-		//com_dcb.fParity = TRUE;
-	}
-	
-
-	if (!SetCommState(Robocon_com, &com_dcb))
-	{
-		/*printf("Serial set fail\n");*/
-		MessageBox(hWnd, TEXT("Serial set fail\n"), MB_OK, TRUE);
-		return -1;
-	}
-	SetupComm(Robocon_com, 1024, 1024);//读写缓冲区
-
-	PurgeComm(Robocon_com, PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);//清除错误标志
-
-	memset(&tim_out, 0, sizeof(tim_out));
-	tim_out.ReadIntervalTimeout = MAXDWORD;//读写时间间隔设置
-	tim_out.ReadTotalTimeoutConstant = 0;
-	tim_out.ReadTotalTimeoutMultiplier = 10;
-	tim_out.WriteTotalTimeoutMultiplier = 50;
-	tim_out.WriteTotalTimeoutConstant = 2000;
-	SetCommTimeouts(Robocon_com, &tim_out);
-
-	return 1;
-}
-//串口发送函数
-DWORD Com_Send(char *p, int len)
-{
-	DWORD write_bytes = len;
-	COMSTAT comstate;
-	DWORD dwErrorFlag;
-	BOOL writeFlag;
-	OVERLAPPED m_osWrite;
-
-	m_osWrite.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);//信号状态设置
-	m_osWrite.Offset = 0;
-	m_osWrite.OffsetHigh = 0;
-
-	writeFlag = WriteFile(Robocon_com, p, write_bytes, &write_bytes, &m_osWrite);//接收
-
-	if (!writeFlag)
-	{
-
-		if (GetLastError() == ERROR_IO_PENDING)
-		{
-			WaitForSingleObject(m_osWrite.hEvent, 1000); //后台发送
-			return write_bytes;
-		}
-		/*printf("Write fail\n");*/
-		MessageBox(hWnd, TEXT("Write fail\n"), MB_OK, TRUE);
-		return 0;
-	}
-	return write_bytes;//写入字节数
-}
-//串口读取函数
-DWORD Com_Recv(char *p, int len)
-{
-	DWORD read_bytes = len;
-	BOOL readstate;
-	DWORD dwErrorFlag;
-	COMSTAT comstate;
-	OVERLAPPED m_osRead = { 0 };
-
-	m_osRead.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-
-	if (m_osRead.hEvent = NULL)
-		return 0;
-
-	memset(&comstate, 0, sizeof(COMSTAT));
-
-	ClearCommError(Robocon_com, &dwErrorFlag, &comstate);
-
-	if (!comstate.cbInQue)//缓冲区无数据
-		return 0;
-
-	if (read_bytes > comstate.cbInQue)//缓冲区实际数据量
-		read_bytes = comstate.cbInQue;
-
-	readstate = ReadFile(Robocon_com, p, read_bytes, &read_bytes, &m_osRead);    //读取到p
-
-	if (!readstate)
-	{
-		if (GetLastError() == ERROR_IO_PENDING)  //后台接收
-		{
-			GetOverlappedResult(Robocon_com, &m_osRead, &read_bytes, TRUE);
-			return read_bytes;//读取字节数
-		}
-
-		/*printf("Read fail\n");*/
-		MessageBox(hWnd, TEXT("Read fail\n"), MB_OK, TRUE);
-		return 0;
-	}
-	return read_bytes;
-}
-
-
-int serial_open(LPCWSTR COMx, int BaudRate) 
-{
-
-	hCom = CreateFile(COMx, //COM1口    
-		GENERIC_READ | GENERIC_WRITE, //允许读和写    
-		0, //独占方式    
-		NULL,
-		OPEN_EXISTING, //打开而不是创建     
-		0, //重叠方式FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED  (同步方式设置为0)
-		NULL);
-	if (hCom == INVALID_HANDLE_VALUE)
-	{
-		//printf("打开COM失败!\n");
-		MessageBox(hWnd, TEXT("打开串口失败"), MB_OK,TRUE);
-		return FALSE;
-	}
-	SetupComm(hCom, 1024, 1024); //输入缓冲区和输出缓冲区的大小都是1024 
-
-								 //设定读写超时 
-								 /*COMMTIMEOUTS TimeOuts;
-								 TimeOuts.ReadIntervalTimeout=1000;
-								 TimeOuts.ReadTotalTimeoutMultiplier=500;
-								 TimeOuts.ReadTotalTimeoutConstant=5000; //设定写超时
-								 TimeOuts.WriteTotalTimeoutMultiplier=500;
-								 TimeOuts.WriteTotalTimeoutConstant = 2000;
-								 SetCommTimeouts(hCom, &TimeOuts); //设置超时
-								 */
-	DCB dcb;
-	GetCommState(hCom, &dcb);
-	dcb.BaudRate = BaudRate;        //设置波特率为BaudRate
-	dcb.ByteSize = 4;				//每个字节有8位 
-	dcb.Parity = NOPARITY;            //无奇偶校验位 
-	dcb.StopBits = ONESTOPBIT;        //一个停止位
-	SetCommState(hCom, &dcb);        //设置参数到hCom
-	PurgeComm(hCom, PURGE_TXCLEAR | PURGE_RXCLEAR);//清空缓存区        //PURGE_TXABORT 中断所有写操作并立即返回，即使写操作还没有完成。
-												   //PURGE_RXABORT 中断所有读操作并立即返回，即使读操作还没有完成。
-												   //PURGE_TXCLEAR 清除输出缓冲区 
-												   //PURGE_RXCLEAR 清除输入缓冲区  
-	return TRUE;
-}
-
-
-
-
+//------------------------一、WinMain入口点
+// win32项目.cpp : 定义应用程序的入口点。
+//
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPWSTR    lpCmdLine,
@@ -235,10 +37,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     LoadStringW(hInstance, IDC_WIN32, szWindowClass, MAX_LOADSTRING);
     MyRegisterClass(hInstance);
 
-	Serial_Init(_T("COM2"), CBR_19200);
-	char p[12] = {0x7e,0x07,0x02,0x02,0x00,0x01,0x00,0x00,0x00,0x00,0xa1,0x7f};
-	Com_Send(p, 12);
-	ComboxInit();
     // 执行应用程序初始化: 
     if (!InitInstance (hInstance, nCmdShow))
     {
@@ -263,7 +61,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 }
 
 
-
+//------------------------二、设计与注册窗口类
 //
 //  函数: MyRegisterClass()
 //
@@ -282,15 +80,27 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.cbClsExtra     = 0;					//预留的额外空间，一般为 0
     wcex.cbWndExtra     = 0;					//预留的额外空间，一般为 0
     wcex.hInstance      = hInstance;			//应用程序的实例句柄
+	wcex.hIconSm		= LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
     wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_WIN32));	//为所有基于该窗口类的窗口设定一个图标
     wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);					//为所有基于该窗口类的窗口设定一个鼠标指针
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);							//	指定窗口背景色
+    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);							//指定窗口背景色
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_WIN32);						//指定窗口菜单
     wcex.lpszClassName  = szWindowClass;									//指定窗口类名
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    
 
-    return RegisterClassExW(&wcex);	
+    return RegisterClassExW(&wcex);		//向操作系统注册窗口类:向系统注册，这样系统才能知道有这个窗口类的存在	
 }
+//------------------------三、创建和显示窗口
+//窗口类注册完成后，就应该创建窗口，然后显示窗口，调用CreateWindow创建窗口，
+//如果成功，会返回一个窗口的句柄，我们对这个窗口的操作都要用到这个句柄。
+//什么是句柄呢？其实它就是一串数字，只是一个标识而已，内存中会存在各种资源，
+//如图标、文本等，为了可以有效标识这些资源，每一个资源都有其唯一的标识符，这样，
+//通过查找标识符，就可以知道某个资源存在于内存中哪一块地址中，就好比你出身的时候，
+//长辈都要为你取个名字，你说名字用来干吗？名字就是用来标识你的，不然，你见到A叫小明，
+//遇到B又叫小明，那谁知道哪个才是小明啊？就好像你上大学去报到号，会为你分配一个可以在
+//本校学生中唯一标识你的学号，所有学生的学号都是不同的，这样，只要通过索引学号，就可
+//以找到你的资料。
+//CreateWindow函数返回一个HWND类型，它就是窗口类的句柄
 
 //
 //   函数: InitInstance(HINSTANCE, int)
@@ -306,21 +116,21 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // 将实例句柄存储在全局变量中
 
-   /*HWND */hWnd = CreateWindowW(szWindowClass, // 窗口类名称
+   HWND hWnd = CreateWindowW(szWindowClass, // 窗口类名称
 							//szTitle,// 窗口标题
-							TEXT("Win32串口"),	// 窗口标题
-							WS_OVERLAPPEDWINDOW,	// 窗口风格，或称窗口格式
+							TEXT("win32完整的开发流程"),	// 窗口标题
+							WS_OVERLAPPEDWINDOW,	// 窗口风格，或称窗口外观样式
 													//WS_OVERLAPPEDWINDOW相当于（WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX）
 							CW_USEDEFAULT,	// 初始 x 坐标
 							0,				// 初始 y 坐标
 							CW_USEDEFAULT,	// 初始 x 方向尺寸
 							0,				// 初始 y 方向尺寸
-							nullptr,	// 父窗口句柄
-							nullptr,	// 窗口菜单句柄
-							hInstance,	// 程序实例句柄
-							nullptr);	// 创建参数
+							nullptr,	// 父窗口句柄,没有父窗口，为NULL 
+							nullptr,	// 窗口菜单句柄,没有菜单，为NULL
+							hInstance,	// 当前应用程序的实例句柄
+							nullptr);	// 创建参数,没有附加数据，为NULL
 
-   if (!hWnd)
+   if (!hWnd)		//检查窗口是否创建成功
    {
       return FALSE;
    }
@@ -509,10 +319,6 @@ INT_PTR CALLBACK Calculator(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 		break;
 	}
 	return (INT_PTR)FALSE;
-}
-int ComboxInit(void)
-{
-	return 0;
 }
 // “下拉列表测试”框的消息处理程序。
 INT_PTR CALLBACK ComboxTest(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)

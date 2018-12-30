@@ -1,3 +1,7 @@
 ﻿  win32项目.cpp
+f:\file\studio\vs_win32\win32com\win32项目\win32项目.cpp(113): warning C4101: “dwErrorFlag”: 未引用的局部变量
+f:\file\studio\vs_win32\win32com\win32项目\win32项目.cpp(112): warning C4101: “comstate”: 未引用的局部变量
+f:\file\studio\vs_win32\win32com\win32项目\win32项目.cpp(239): warning C4838: 从“int”转换到“char”需要收缩转换
+f:\file\studio\vs_win32\win32com\win32项目\win32项目.cpp(239): warning C4309: “初始化”: 截断常量值
   win32项目.vcxproj -> F:\FILE\studio\VS_win32\win32com\x64\Debug\win32项目.exe
   win32项目.vcxproj -> F:\FILE\studio\VS_win32\win32com\x64\Debug\win32项目.pdb (Full PDB)
