@@ -10,14 +10,14 @@ HINSTANCE hInst;                                // 当前实例
 WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 
+HWND Login_Button;			//登录按钮
+
 // 此代码模块中包含的函数的前向声明: 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
-LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK    WindowProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    NewWin(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    Calculator(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    ComboxTest(HWND, UINT, WPARAM, LPARAM);
+
 
 //------------------------一、WinMain入口点
 // win32项目.cpp : 定义应用程序的入口点。
@@ -35,25 +35,33 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // 初始化全局字符串
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_WIN32, szWindowClass, MAX_LOADSTRING);
-    MyRegisterClass(hInstance);
+    MyRegisterClass(hInstance);		//二、设计与注册窗口类
 
     // 执行应用程序初始化: 
-    if (!InitInstance (hInstance, nCmdShow))
+    if (!InitInstance (hInstance, nCmdShow))	//三、创建和显示窗口
     {
         return FALSE;
     }
 
-    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WIN32));
+    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WIN32));	//调入加速键表。该函数调入指定的加速键表。
 
     MSG msg;
 
-    // 主消息循环: 
+    // 五、消息循环 
     while (GetMessage(&msg, nullptr, 0, 0))
     {
         if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
         {
             TranslateMessage(&msg);
+			/*TranslateMessage是用于转换按键信息的，因为键盘按下和弹起会
+			发送WM_KEYDOWN和WM_KEYUP消息，但如果我们只想知道用户输了哪
+			些字符，这个函数可以把这些消息转换为WM_CHAR消息，它表示的就
+			是键盘按下的那个键的字符，如“A”，这样我们处理起来就更方便了。*/
             DispatchMessage(&msg);
+			/*DispatchMessage函数是必须调用的，它的功能就相当于一根传送带，
+			每收到一条消息，DispatchMessage函数负责把消息传到WindowProc让
+			我们的代码来处理，如果不调用这个函数，我们定义的WindowProc就永
+			远接收不到消息，你就不能做消息响应了，你的程序就只能从运行就开始死掉了，没有响应。*/
         }
     }
 
@@ -69,6 +77,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 //
 ATOM MyRegisterClass(HINSTANCE hInstance)
 {
+	//**************在注册窗口类之前必须填充所有WNDCLASS结构体
     WNDCLASSEXW wcex;
 
     wcex.cbSize = sizeof(WNDCLASSEX);
@@ -76,7 +85,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.style          = CS_HREDRAW | CS_VREDRAW;//指定窗口类型，各种“类风格”,可以使用按位或操作符组合起来
 												  //CS_VREDRAW	移动或者调整窗口的高度（垂直方向）时，重绘整个窗口
 												  //CS_HREDRAW	移动或者调整窗口的宽度（水平方向）时，重绘整个窗口
-    wcex.lpfnWndProc    = WndProc;				//指定窗口过程（必须是回调函数）
+    wcex.lpfnWndProc    = WindowProc;				//指定窗口过程（必须是回调函数）
     wcex.cbClsExtra     = 0;					//预留的额外空间，一般为 0
     wcex.cbWndExtra     = 0;					//预留的额外空间，一般为 0
     wcex.hInstance      = hInstance;			//应用程序的实例句柄
@@ -86,6 +95,20 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
     wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);							//指定窗口背景色
     wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_WIN32);						//指定窗口菜单
     wcex.lpszClassName  = szWindowClass;									//指定窗口类名
+
+	//wcex.style = CS_HREDRAW | CS_VREDRAW;//指定窗口类型，各种“类风格”,可以使用按位或操作符组合起来
+	//									 //CS_VREDRAW	移动或者调整窗口的高度（垂直方向）时，重绘整个窗口
+	//									 //CS_HREDRAW	移动或者调整窗口的宽度（水平方向）时，重绘整个窗口
+	//wcex.lpfnWndProc = WindowProc;				//指定窗口过程（必须是回调函数）
+	//wcex.cbClsExtra = 0;					//预留的额外空间，一般为 0
+	//wcex.cbWndExtra = 0;					//预留的额外空间，一般为 0
+	//wcex.hInstance = hInstance;			//应用程序的实例句柄
+	//wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+	//wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_WIN32));	//为所有基于该窗口类的窗口设定一个图标
+	//wcex.hCursor = nullptr;					//为所有基于该窗口类的窗口设定一个鼠标指针
+	//wcex.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);							//指定窗口背景色
+	//wcex.lpszMenuName = nullptr;						//指定窗口菜单
+	//wcex.lpszClassName = szWindowClass;									//指定窗口类名
     
 
     return RegisterClassExW(&wcex);		//向操作系统注册窗口类:向系统注册，这样系统才能知道有这个窗口类的存在	
@@ -115,20 +138,53 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // 将实例句柄存储在全局变量中
+   HWND hWnd;
+   //--------------------------------居中
+   RECT rc, rc1, rctomove;
+   int width = GetSystemMetrics(SM_CXSCREEN);
+   int height = GetSystemMetrics(SM_CYSCREEN);
+   rc.left = 0;
+   rc.top = 0;
+   rc.right = width;
+   rc.bottom = height;
+   
 
-   HWND hWnd = CreateWindowW(szWindowClass, // 窗口类名称
+  hWnd = CreateWindowW(szWindowClass, // 窗口类名称
 							//szTitle,// 窗口标题
 							TEXT("win32完整的开发流程"),	// 窗口标题
 							WS_OVERLAPPEDWINDOW,	// 窗口风格，或称窗口外观样式
 													//WS_OVERLAPPEDWINDOW相当于（WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX）
-							CW_USEDEFAULT,	// 初始 x 坐标
+							0,	// 初始 x 坐标
 							0,				// 初始 y 坐标
-							CW_USEDEFAULT,	// 初始 x 方向尺寸
-							0,				// 初始 y 方向尺寸
+							500,	// 初始 x 方向尺寸
+							500,				// 初始 y 方向尺寸
 							nullptr,	// 父窗口句柄,没有父窗口，为NULL 
 							nullptr,	// 窗口菜单句柄,没有菜单，为NULL
 							hInstance,	// 当前应用程序的实例句柄
 							nullptr);	// 创建参数,没有附加数据，为NULL
+
+  GetClientRect(hWnd, &rc1);//该函数获取窗口客户区的大小
+
+  rctomove.left		= (rc.right - rc.left) / 2 - (rc1.right - rc1.left) / 2;
+  rctomove.right	= (rc.right - rc.left) / 2 + (rc1.right - rc1.left) / 2;
+  rctomove.top		= (rc.bottom - rc.top) / 2 - (rc1.bottom - rc1.top) / 2;
+  rctomove.bottom	= (rc.bottom - rc.top) / 2 + (rc1.bottom - rc1.top) / 2;
+  ::SetWindowPos(hWnd, HWND_TOPMOST, rctomove.left, rctomove.top, rc1.right - rc1.left, rc1.bottom - rc1.top, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_HIDEWINDOW);
+
+
+   //HWND hWnd = CreateWindowW(szWindowClass, // 窗口类名称
+			//								//szTitle,// 窗口标题
+	  // TEXT("win32完整的开发流程"),	// 窗口标题
+	  // WS_OVERLAPPEDWINDOW,	// 窗口风格，或称窗口外观样式
+			//				//WS_OVERLAPPEDWINDOW相当于（WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX）
+	  // CW_USEDEFAULT,	// 初始 x 坐标
+	  // 0,				// 初始 y 坐标
+	  // CW_USEDEFAULT,	// 初始 x 方向尺寸
+	  // 0,				// 初始 y 方向尺寸
+	  // nullptr,	// 父窗口句柄,没有父窗口，为NULL 
+	  // nullptr,	// 窗口菜单句柄,没有菜单，为NULL
+	  // hInstance,	// 当前应用程序的实例句柄
+	  // nullptr);	// 创建参数,没有附加数据，为NULL
 
    if (!hWnd)		//检查窗口是否创建成功
    {
@@ -136,13 +192,15 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    }
 
    ShowWindow(hWnd, nCmdShow);	//显示窗口
+	//------------------------四、更新窗口（可选）
    UpdateWindow(hWnd);			//更新窗口
 
    return TRUE;
 }
 
+//------------------------六、消息响应
 //
-//  函数: WndProc(HWND, UINT, WPARAM, LPARAM)
+//  函数: WindowProc(HWND, UINT, WPARAM, LPARAM)
 //
 //  目的:    处理主窗口的消息。
 //
@@ -151,7 +209,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //  WM_DESTROY  - 发送退出消息并返回
 //
 //
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
@@ -164,26 +222,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
-			case IDM_NEW:
-				DialogBox(hInst, MAKEINTRESOURCE(IDD_NewBox), hWnd, NewWin);
-				break;
-			case IDM_Calculator:
-				DialogBox(hInst, MAKEINTRESOURCE(IDD_Calculator), hWnd, Calculator);
-				break;
-			case IDM_ComboT:
-				DialogBox(hInst, MAKEINTRESOURCE(IDD_Combox), hWnd, ComboxTest);
-				break;
+
             case IDM_EXIT:
-                DestroyWindow(hWnd);
+                DestroyWindow(hWnd);	//销毁指定的窗口。这个函数通过发送WM_DESTROY 消息和 WM_NCDESTROY 消息使窗口无效并移除其键盘焦点。
+										//这个函数还销毁窗口的菜单，清空线程的消息队列，销毁与窗口过程相关的定时器，解除窗口对剪贴板的拥有权，打断剪贴板器的查看链。
                 break;
-			case IDC_TEST:
-				DestroyWindow(hWnd);
+
 
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
         }
         break;
+	case WM_CREATE:
+		Login_Button = CreateWindow(TEXT("button"), TEXT("test"), WS_CHILD | WS_VISIBLE| BS_PUSHBUTTON, 0, 0, 70, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance,NULL);
+
+		break;
     case WM_PAINT:
         {
             PAINTSTRUCT ps;
@@ -201,7 +255,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_DESTROY:
-        PostQuitMessage(0);
+        PostQuitMessage(0);	//该函数向系统表明有个线程有终止请求。通常用来响应WM_DESTROY消息。
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
@@ -227,132 +281,4 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     }
     return (INT_PTR)FALSE;
-}
-
-// “新窗口”框的消息处理程序。
-INT_PTR CALLBACK NewWin(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	//wParam 高两个字节 通知码
-	//wParam 低两字节 命令ID
-	//lParam 发送命令消息的子窗体句柄。
-	UNREFERENCED_PARAMETER(lParam);
-	switch (message)
-	{		
-	case WM_INITDIALOG:	
-		//WM_INITDIALOG消息是对话框才能收到的消息，表明对话框及其所有子控件都创建完毕了。
-		//这个状态肯定是在调用显示对话框的函数之前，因此可以在WM_INITDIALOG消息响应函数中添加对编辑框控件的初始化和修改
-		return (INT_PTR)TRUE;
-
-	case WM_COMMAND:
-		//WM_COMMAND产生的条件：点击菜单， 点击加速键，点击子窗口按钮，点击工具栏按钮。这些时候都有command消息产生。
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
-			EndDialog(hDlg, LOWORD(wParam));	//是清除一个模态对话框,并使系统中止对对话框的任何处理的函数。
-			return (INT_PTR)TRUE;
-		}
-		if (LOWORD(wParam) == IDC_TEST)
-		{
-			//HWND* pEDit= GetDlgItem(hDlg, IDC_EDIT1);
-			
-			//SetWindowText(hDlg,TEXT("dft"));
-			SetDlgItemInt(hDlg, IDC_EDIT1,5,true);
-			SetDlgItemText(hDlg, IDC_EDIT2, TEXT("3234"));
-			//SetDlgItemText(hDlg, IDC_EDIT2, TEXT("sdfd"));
-		}
-		if (LOWORD(wParam) == IDC_SetEditText)
-		{
-			SetDlgItemText(hDlg, IDC_EDIT1, TEXT("编辑框内容已设置"));
-			//SetDlgItemText(hDlg, IDC_EDIT2, TEXT("编辑框内容已复制"));
-		}
-		if (LOWORD(wParam) == IDC_CopyEditdata)
-		{
-			//SetDlgItemText(hDlg, IDC_EDIT1, TEXT("编辑框内容已设置"));
-			wchar_t str[2000];
-			GetDlgItemText(hDlg, IDC_EDIT1, str,500);
-			SetDlgItemText(hDlg, IDC_EDIT2, str);
-		}
-		break;
-	}
-	return (INT_PTR)FALSE;
-}
-
-// “计算器”框的消息处理程序。
-INT_PTR CALLBACK Calculator(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	//wParam 高两个字节 通知码
-	//wParam 低两字节 命令ID
-	//lParam 发送命令消息的子窗体句柄。
-	UNREFERENCED_PARAMETER(lParam);
-	switch (message)
-	{
-	case WM_INITDIALOG:
-		//WM_INITDIALOG消息是对话框才能收到的消息，表明对话框及其所有子控件都创建完毕了。
-		//这个状态肯定是在调用显示对话框的函数之前，因此可以在WM_INITDIALOG消息响应函数中添加对编辑框控件的初始化和修改
-		return (INT_PTR)TRUE;
-
-	case WM_COMMAND:
-		//WM_COMMAND产生的条件：点击菜单， 点击加速键，点击子窗口按钮，点击工具栏按钮。这些时候都有command消息产生。
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
-			EndDialog(hDlg, LOWORD(wParam));	//是清除一个模态对话框,并使系统中止对对话框的任何处理的函数。
-			return (INT_PTR)TRUE;
-		}
-		//加法按键
-		if (LOWORD(wParam) == IDC_ADD)
-		{
-
-			//SetDlgItemText(hDlg, IDC_DATA1, TEXT("编辑框内容已设置"));
-			//SetDlgItemText(hDlg, IDC_EDIT2, TEXT("编辑框内容已复制"));
-			int a = GetDlgItemInt(hDlg, IDC_DATA1, NULL, true);
-			int b = GetDlgItemInt(hDlg, IDC_DATA2, NULL, true);
-			int c = a+b;
-			SetDlgItemInt(hDlg, IDC_RESULT, c, TRUE);
-		}
-		//减法按键
-		if (LOWORD(wParam) == IDC_Subtraction)
-		{
-			int a = GetDlgItemInt(hDlg, IDC_DATA1, NULL, true);
-			int b = GetDlgItemInt(hDlg, IDC_DATA2, NULL, true);
-			int c = a - b;
-			SetDlgItemInt(hDlg, IDC_RESULT, c, TRUE);
-		}
-		break;
-	}
-	return (INT_PTR)FALSE;
-}
-// “下拉列表测试”框的消息处理程序。
-INT_PTR CALLBACK ComboxTest(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-	//wParam 高两个字节 通知码
-	//wParam 低两字节 命令ID
-	//lParam 发送命令消息的子窗体句柄。
-	UNREFERENCED_PARAMETER(lParam);
-	switch (message)
-	{
-	case WM_INITDIALOG:
-		//WM_INITDIALOG消息是对话框才能收到的消息，表明对话框及其所有子控件都创建完毕了。
-		//这个状态肯定是在调用显示对话框的函数之前，因此可以在WM_INITDIALOG消息响应函数中添加对编辑框控件的初始化和修改
-
-		
-
-		return (INT_PTR)TRUE;
-
-	case WM_COMMAND:
-		//WM_COMMAND产生的条件：点击菜单， 点击加速键，点击子窗口按钮，点击工具栏按钮。这些时候都有command消息产生。
-		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-		{
-			EndDialog(hDlg, LOWORD(wParam));	//是清除一个模态对话框,并使系统中止对对话框的任何处理的函数。
-			return (INT_PTR)TRUE;
-		}
-		//-----------------向Combox添加数据
-		HWND hWndComboBox = GetDlgItem(hDlg, IDC_COMBO1);
-		TCHAR szMessage[20] = TEXT("2400");
-		SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
-		SendMessage(hWndComboBox, CB_INSERTSTRING, 0, (LPARAM)TEXT("4800"));
-		SendMessage(hWndComboBox, CB_INSERTSTRING, 1, (LPARAM)TEXT("9600"));
-		SendMessage(hWndComboBox, CB_INSERTSTRING, 2, (LPARAM)TEXT("19200"));
-		SendMessage(hWndComboBox, CB_INSERTSTRING, 3, (LPARAM)TEXT("115200"));
-		SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);//设置默认值
-	}
-	return (INT_PTR)FALSE;
 }

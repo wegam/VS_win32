@@ -182,7 +182,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DrawText(hdc, TEXT("绘制窗口1行\n绘制窗口2行\n"), -1, &rect,
 
 				DT_CENTER | DT_VCENTER | DT_WORDBREAK | DT_WORD_ELLIPSIS);
-
             EndPaint(hWnd, &ps);
         }
         break;
