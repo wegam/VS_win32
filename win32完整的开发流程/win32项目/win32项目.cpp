@@ -3,6 +3,12 @@
 #include "stdafx.h"
 #include "win32项目.h"
 
+
+#include"stdio.h "
+
+#pragma warning(disable:4996)
+#define _CRT_SECURE_NO_WARNINGS
+
 #define MAX_LOADSTRING 100
 
 // 全局变量: 
@@ -152,11 +158,12 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
   hWnd = CreateWindowW(szWindowClass, // 窗口类名称
 							//szTitle,// 窗口标题
 							TEXT("win32完整的开发流程"),	// 窗口标题
-							WS_OVERLAPPEDWINDOW,	// 窗口风格，或称窗口外观样式
+							//WS_OVERLAPPEDWINDOW,	// 窗口风格，或称窗口外观样式
 													//WS_OVERLAPPEDWINDOW相当于（WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX）
+							WS_OVERLAPPEDWINDOW^WS_THICKFRAME,		//禁止改变大小
 							0,	// 初始 x 坐标
 							0,				// 初始 y 坐标
-							500,	// 初始 x 方向尺寸
+							800,	// 初始 x 方向尺寸
 							500,				// 初始 y 方向尺寸
 							nullptr,	// 父窗口句柄,没有父窗口，为NULL 
 							nullptr,	// 窗口菜单句柄,没有菜单，为NULL
@@ -169,7 +176,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
   rctomove.right	= (rc.right - rc.left) / 2 + (rc1.right - rc1.left) / 2;
   rctomove.top		= (rc.bottom - rc.top) / 2 - (rc1.bottom - rc1.top) / 2;
   rctomove.bottom	= (rc.bottom - rc.top) / 2 + (rc1.bottom - rc1.top) / 2;
-  ::SetWindowPos(hWnd, HWND_TOPMOST, rctomove.left, rctomove.top, rc1.right - rc1.left, rc1.bottom - rc1.top, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_HIDEWINDOW);
+  ::SetWindowPos(hWnd, HWND_TOPMOST, rctomove.left, rctomove.top, rc1.right - rc1.left, rc1.bottom - rc1.top, SWP_NOZORDER |SWP_FRAMECHANGED | SWP_NOREDRAW | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_HIDEWINDOW);
 
 
    //HWND hWnd = CreateWindowW(szWindowClass, // 窗口类名称
@@ -235,8 +242,51 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         }
         break;
 	case WM_CREATE:
-		Login_Button = CreateWindow(TEXT("button"), TEXT("test"), WS_CHILD | WS_VISIBLE| BS_PUSHBUTTON, 0, 0, 70, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance,NULL);
+		//---------------------------------------静态字符
+		Login_Button = CreateWindow(TEXT("static"), TEXT("串口号："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 0, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("波特率："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 60, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("校验位："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 120, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("停止位："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 180, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		//---------------------------------------添加按键
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开RGB"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开红灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 100, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开黄灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 200, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开蓝灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 300, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开门锁"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 400, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开背光"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 500, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开串口"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 240, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("清空数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 370, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("发送数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		//---------------------------------------下拉列表
+		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("串口号"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 30, 80, 100, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("COM1"));
+		SendMessage(Login_Button, CB_ADDSTRING, 1, (LPARAM)TEXT("COM2"));
+		SendMessage(Login_Button, CB_ADDSTRING, 2, (LPARAM)TEXT("COM3"));
+		SendMessage(Login_Button, CB_ADDSTRING, 3, (LPARAM)TEXT("COM4"));
+		SendMessage(Login_Button, CB_SETCURSEL, 2, 0);//设置默认值
 
+		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("波特率"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 90, 80, 100, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("2400"));
+		SendMessage(Login_Button, CB_ADDSTRING, 1, (LPARAM)TEXT("9600"));
+		SendMessage(Login_Button, CB_ADDSTRING, 2, (LPARAM)TEXT("19200"));
+		SendMessage(Login_Button, CB_ADDSTRING, 3, (LPARAM)TEXT("115200"));
+		SendMessage(Login_Button, CB_SETCURSEL, 2, 0);//设置默认值
+
+		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("校验位"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 150, 80, 100, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("奇校验"));
+		SendMessage(Login_Button, CB_ADDSTRING, 1, (LPARAM)TEXT("偶校验"));
+		SendMessage(Login_Button, CB_ADDSTRING, 2, (LPARAM)TEXT("无校验"));
+		SendMessage(Login_Button, CB_SETCURSEL, 2, 0);//设置默认值
+
+		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("停止位"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 210, 80, 100, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("1位"));
+		SendMessage(Login_Button, CB_ADDSTRING, 1, (LPARAM)TEXT("1.5位"));
+		SendMessage(Login_Button, CB_ADDSTRING, 2, (LPARAM)TEXT("2位"));
+		SendMessage(Login_Button, CB_SETCURSEL, 0, 0);//设置默认值
+
+		//---------------------------------------显示框
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/| ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/| ES_READONLY/*只读*/, 0, 0, 680, 200, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/ | ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/ /*| ES_READONLY只读*/, 0, 205, 680, 200, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		break;
     case WM_PAINT:
         {
@@ -244,12 +294,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			
             HDC hdc = BeginPaint(hWnd, &ps);
             // TODO: 在此处添加使用 hdc 的任何绘图代码...
-			RECT rect;
+			/*RECT rect;
 
 			GetClientRect(hWnd, &rect);
 			DrawText(hdc, TEXT("绘制窗口1行\n绘制窗口2行\n"), -1, &rect,
 
-				DT_CENTER | DT_VCENTER | DT_WORDBREAK | DT_WORD_ELLIPSIS);
+				DT_CENTER | DT_VCENTER | DT_WORDBREAK | DT_WORD_ELLIPSIS);*/
 
             EndPaint(hWnd, &ps);
         }

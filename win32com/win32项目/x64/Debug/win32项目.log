@@ -1,4 +1,5 @@
-﻿  win32项目.cpp
+﻿  stdafx.cpp
+  win32项目.cpp
 f:\file\studio\vs_win32\win32com\win32项目\win32项目.cpp(113): warning C4101: “dwErrorFlag”: 未引用的局部变量
 f:\file\studio\vs_win32\win32com\win32项目\win32项目.cpp(112): warning C4101: “comstate”: 未引用的局部变量
 f:\file\studio\vs_win32\win32com\win32项目\win32项目.cpp(239): warning C4838: 从“int”转换到“char”需要收缩转换

@@ -306,6 +306,50 @@ INT_PTR CALLBACK Calculator(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 	return (INT_PTR)FALSE;
 }
 // “下拉列表测试”框的消息处理程序。
+void InitComboxList(HWND hDlg)
+{
+	/*TCHAR achTemp[256] = TEXT("Food");
+	TCHAR achTemp_One[256] = TEXT("Dog");
+	TCHAR achTemp_Two[256] = TEXT("Fish");
+
+	TCHAR hbmBread[256] = TEXT("Food");
+	TCHAR hbmMask[256] = TEXT("Dog");
+	TCHAR hbmTemp[256] = TEXT("Fish");
+
+	DWORD dwIndex;*/
+
+	// Get the handle of the food groups combo box.  
+	/*HWND hwndGroupsBox = GetDlgItem(hDlg, IDC_COMBO2);
+
+	dwIndex = SendMessage(hwndGroupsBox, CB_ADDSTRING, 0, (LPARAM)achTemp);
+	SendMessage(hwndGroupsBox, CB_SETITEMDATA, dwIndex, (LPARAM)hbmBread);
+
+	dwIndex = SendMessage(hwndGroupsBox, CB_ADDSTRING, 1, (LPARAM)achTemp_One);
+	SendMessage(hwndGroupsBox, CB_SETITEMDATA, dwIndex, (LPARAM)hbmMask);
+
+	dwIndex = SendMessage(hwndGroupsBox, CB_ADDSTRING, 2, (LPARAM)achTemp_Two);
+	SendMessage(hwndGroupsBox, CB_SETITEMDATA, dwIndex, (LPARAM)hbmTemp);*/
+
+	HWND hwndGroupsBox = GetDlgItem(hDlg, IDC_COMBO1);
+	SendMessage(hwndGroupsBox, CB_RESETCONTENT, 0, 0);
+	SendMessage(hwndGroupsBox, CB_INSERTSTRING, 0, (LPARAM)TEXT("4800"));
+	SendMessage(hwndGroupsBox, CB_INSERTSTRING, 1, (LPARAM)TEXT("9600"));
+	SendMessage(hwndGroupsBox, CB_INSERTSTRING, 2, (LPARAM)TEXT("19200"));
+	SendMessage(hwndGroupsBox, CB_INSERTSTRING, 3, (LPARAM)TEXT("115200"));
+	SendMessage(hwndGroupsBox, CB_SETCURSEL, 0, 0);//设置默认值
+
+
+	//-----------------向Combox添加数据
+	HWND hWndComboBox = GetDlgItem(hDlg, IDC_COMBO2);
+	/*TCHAR szMessage[20] = TEXT("2400");*/
+	SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
+	SendMessage(hWndComboBox, CB_INSERTSTRING, 0, (LPARAM)TEXT("4800"));
+	SendMessage(hWndComboBox, CB_INSERTSTRING, 1, (LPARAM)TEXT("9600"));
+	SendMessage(hWndComboBox, CB_INSERTSTRING, 2, (LPARAM)TEXT("19200"));
+	SendMessage(hWndComboBox, CB_INSERTSTRING, 3, (LPARAM)TEXT("115200"));
+	SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);//设置默认值
+
+}
 INT_PTR CALLBACK ComboxTest(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	//wParam 高两个字节 通知码
@@ -317,7 +361,13 @@ INT_PTR CALLBACK ComboxTest(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 	case WM_INITDIALOG:
 		//WM_INITDIALOG消息是对话框才能收到的消息，表明对话框及其所有子控件都创建完毕了。
 		//这个状态肯定是在调用显示对话框的函数之前，因此可以在WM_INITDIALOG消息响应函数中添加对编辑框控件的初始化和修改
+		//初始化下拉框  
+		InitComboxList(hDlg);
+		//SendDlgItemMessage(hDlg, IDC_COMBO2, CB_SETCURSEL, 0, 0);
 
+
+
+		return (INT_PTR)TRUE;
 		
 
 		return (INT_PTR)TRUE;
@@ -330,14 +380,14 @@ INT_PTR CALLBACK ComboxTest(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
 			return (INT_PTR)TRUE;
 		}
 		//-----------------向Combox添加数据
-		HWND hWndComboBox = GetDlgItem(hDlg, IDC_COMBO1);
-		TCHAR szMessage[20] = TEXT("2400");
-		SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
-		SendMessage(hWndComboBox, CB_INSERTSTRING, 0, (LPARAM)TEXT("4800"));
-		SendMessage(hWndComboBox, CB_INSERTSTRING, 1, (LPARAM)TEXT("9600"));
-		SendMessage(hWndComboBox, CB_INSERTSTRING, 2, (LPARAM)TEXT("19200"));
-		SendMessage(hWndComboBox, CB_INSERTSTRING, 3, (LPARAM)TEXT("115200"));
-		SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);//设置默认值
+		//HWND hWndComboBox = GetDlgItem(hDlg, IDC_COMBO1);
+		//TCHAR szMessage[20] = TEXT("2400");
+		//SendMessage(hWndComboBox, CB_RESETCONTENT, 0, 0);
+		//SendMessage(hWndComboBox, CB_INSERTSTRING, 0, (LPARAM)TEXT("4800"));
+		//SendMessage(hWndComboBox, CB_INSERTSTRING, 1, (LPARAM)TEXT("9600"));
+		//SendMessage(hWndComboBox, CB_INSERTSTRING, 2, (LPARAM)TEXT("19200"));
+		//SendMessage(hWndComboBox, CB_INSERTSTRING, 3, (LPARAM)TEXT("115200"));
+		//SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);//设置默认值
 	}
 	return (INT_PTR)FALSE;
 }
