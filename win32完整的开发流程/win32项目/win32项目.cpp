@@ -164,7 +164,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 							0,	// 初始 x 坐标
 							0,				// 初始 y 坐标
 							800,	// 初始 x 方向尺寸
-							500,				// 初始 y 方向尺寸
+							550,				// 初始 y 方向尺寸
 							nullptr,	// 父窗口句柄,没有父窗口，为NULL 
 							nullptr,	// 窗口菜单句柄,没有菜单，为NULL
 							hInstance,	// 当前应用程序的实例句柄
@@ -247,30 +247,56 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		Login_Button = CreateWindow(TEXT("static"), TEXT("波特率："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 60, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("static"), TEXT("校验位："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 120, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("static"), TEXT("停止位："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 180, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		
+		Login_Button = CreateWindow(TEXT("static"), TEXT("接收计数："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 280, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("发送计数："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 325, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+
+		Login_Button = CreateWindow(TEXT("static"), TEXT("状态栏："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 470, 800, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+
+		Login_Button = CreateWindow(TEXT("static"), TEXT("Address1："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("Address2："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 200, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("Address3："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 400, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		//---------------------------------------添加按键
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开RGB"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开红灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 100, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开黄灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 200, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开蓝灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 300, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开门锁"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 400, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开背光"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 500, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开串口"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 240, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("清空数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 370, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("发送数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 410, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开串口"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 375, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("清空数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 405, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("发送数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开RGB"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开红灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 100, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开黄灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 200, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开蓝灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 300, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开门锁"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 400, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开背光"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 500, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		//---------------------------------------选择框
+		Login_Button = CreateWindow(TEXT("button"), TEXT("Hex接收"), WS_CHILD | WS_VISIBLE | BS_CHECKBOX, 700, 235, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("Hex发送"), WS_CHILD | WS_VISIBLE | BS_CHECKBOX, 700, 255, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		//---------------------------------------下拉列表
 		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("串口号"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 30, 80, 100, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("COM1"));
-		SendMessage(Login_Button, CB_ADDSTRING, 1, (LPARAM)TEXT("COM2"));
-		SendMessage(Login_Button, CB_ADDSTRING, 2, (LPARAM)TEXT("COM3"));
-		SendMessage(Login_Button, CB_ADDSTRING, 3, (LPARAM)TEXT("COM4"));
+		for (int i = 0; i <= 16; i++)
+		{
+			wchar_t str[80];
+			//sprintf(str, "%x", i); //将10.8转为字符串
+			//itoa(i, str,10);
+			swprintf_s(str, 16, L"COM%d", i); //将x=1234输出到buffer
+			wprintf(str);
+			SendMessage(Login_Button, CB_ADDSTRING, i, (LPARAM)(str));
+		}
 		SendMessage(Login_Button, CB_SETCURSEL, 2, 0);//设置默认值
 
 		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("波特率"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 90, 80, 100, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("2400"));
-		SendMessage(Login_Button, CB_ADDSTRING, 1, (LPARAM)TEXT("9600"));
-		SendMessage(Login_Button, CB_ADDSTRING, 2, (LPARAM)TEXT("19200"));
-		SendMessage(Login_Button, CB_ADDSTRING, 3, (LPARAM)TEXT("115200"));
-		SendMessage(Login_Button, CB_SETCURSEL, 2, 0);//设置默认值
+		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("1200"));
+		SendMessage(Login_Button, CB_ADDSTRING, 1, (LPARAM)TEXT("2400"));
+		SendMessage(Login_Button, CB_ADDSTRING, 2, (LPARAM)TEXT("4800"));
+		SendMessage(Login_Button, CB_ADDSTRING, 3, (LPARAM)TEXT("9600"));
+		SendMessage(Login_Button, CB_ADDSTRING, 4, (LPARAM)TEXT("14400"));
+		SendMessage(Login_Button, CB_ADDSTRING, 5, (LPARAM)TEXT("19200"));
+		SendMessage(Login_Button, CB_ADDSTRING, 6, (LPARAM)TEXT("38400"));
+		SendMessage(Login_Button, CB_ADDSTRING, 7, (LPARAM)TEXT("56000"));
+		SendMessage(Login_Button, CB_ADDSTRING, 8, (LPARAM)TEXT("57600"));
+		SendMessage(Login_Button, CB_ADDSTRING, 9, (LPARAM)TEXT("115200"));
+		SendMessage(Login_Button, CB_ADDSTRING, 10, (LPARAM)TEXT("128000"));
+		SendMessage(Login_Button, CB_ADDSTRING, 11, (LPARAM)TEXT("256000"));
+		SendMessage(Login_Button, CB_SETCURSEL, 5, 0);//设置默认值
 
 		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("校验位"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 150, 80, 100, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("奇校验"));
@@ -284,9 +310,54 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		SendMessage(Login_Button, CB_ADDSTRING, 2, (LPARAM)TEXT("2位"));
 		SendMessage(Login_Button, CB_SETCURSEL, 0, 0);//设置默认值
 
+		
+
+		//---------------------------------------下拉列表Address1
+		Login_Button = CreateWindow(TEXT("Listbox"), TEXT("Address1"), WS_CHILD |  WS_VSCROLL|WS_BORDER | WS_VISIBLE | LBS_HASSTRINGS | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 100, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		wchar_t str[80];
+		for (int i = 0; i <= 16; i++)
+		{
+			//sprintf(str, "%x", i); //将10.8转为字符串
+			//itoa(i, str,10);
+			swprintf_s(str,4,L"%d", i); //将x=1234输出到buffer
+			wprintf(str);
+			SendMessage(Login_Button, LB_ADDSTRING, i, (LPARAM)(str));			
+		}
+		SendMessage(Login_Button, LB_ADDSTRING, 17, (LPARAM)(TEXT("0xFF")));
+		SendMessage(Login_Button, LB_SETCURSEL, (WPARAM)0, 0);
+		//---------------------------------------下拉列表Address2
+		Login_Button = CreateWindow(TEXT("Listbox"), TEXT("Address2"), WS_CHILD | WS_VSCROLL | WS_BORDER | WS_VISIBLE | LBS_HASSTRINGS | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 300, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		for (int i = 0; i <= 16; i++)
+		{
+			//sprintf(str, "%x", i); //将10.8转为字符串
+			//itoa(i, str,10);
+			swprintf_s(str, 4, L"%d", i); //将x=1234输出到buffer
+			wprintf(str);
+			SendMessage(Login_Button, LB_ADDSTRING, i, (LPARAM)(str));
+		}
+		SendMessage(Login_Button, LB_ADDSTRING, 17, (LPARAM)(TEXT("0xFF")));
+		SendMessage(Login_Button, LB_SETCURSEL, (WPARAM)0, 0);
+		//---------------------------------------下拉列表Address3
+		Login_Button = CreateWindow(TEXT("Listbox"), TEXT("Address3"), WS_CHILD | WS_VSCROLL | WS_BORDER | WS_VISIBLE | LBS_HASSTRINGS | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 500, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		for (int i = 0; i <= 16; i++)
+		{
+			//sprintf(str, "%x", i); //将10.8转为字符串
+			//itoa(i, str,10);
+			swprintf_s(str, 4, L"%d", i); //将x=1234输出到buffer
+			wprintf(str);
+			SendMessage(Login_Button, LB_ADDSTRING, i, (LPARAM)(str));
+		}
+		SendMessage(Login_Button, LB_ADDSTRING, 17, (LPARAM)(TEXT("0xFF")));
+		SendMessage(Login_Button, LB_SETCURSEL, (WPARAM)0, 0);
+
+		
+
 		//---------------------------------------显示框
-		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/| ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/| ES_READONLY/*只读*/, 0, 0, 680, 200, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/ | ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/ /*| ES_READONLY只读*/, 0, 205, 680, 200, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/| ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/| ES_READONLY/*只读*/, 0, 0, 695, 200, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/ | ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/ /*| ES_READONLY只读*/, 0, 205, 695, 200, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收计数"), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_READONLY/*只读*/, 700, 300, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送计数"), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/  | ES_READONLY/*只读*/, 700, 345, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		break;
     case WM_PAINT:
         {
