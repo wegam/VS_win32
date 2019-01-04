@@ -17,14 +17,189 @@ WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 
 HWND Login_Button;			//登录按钮
+HANDLE Robocon_com;
 
 // 此代码模块中包含的函数的前向声明: 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WindowProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK	SerailConfiguration(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK	ClearData(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
+int Serial_Init(HWND hDlg,LPCWSTR COMx, int BaudRate)
+{
+	DCB com_dcb;    //参数设置
+	COMMTIMEOUTS tim_out;
+
+	//Robocon_com = CreateFile(COMx, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
+	Robocon_com = CreateFile(COMx, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL , NULL);
+	if (Robocon_com == (HANDLE)-1)
+	{
+		/*printf("Serial open fail\n");*/
+		MessageBox(hDlg, TEXT("串口打开失败\n"), MB_OK, TRUE);
+		return -1;
+	}
+
+	if (GetCommState(Robocon_com, &com_dcb))//获取COM状态，配置参数
+	{
+		com_dcb.BaudRate			= BaudRate;//波特率
+		com_dcb.fBinary				= TRUE;		// 设置二进制模式，此处必须设置TRUE 
+		com_dcb.fParity				= FALSE;	// 支持奇偶校验
+		com_dcb.fOutxCtsFlow		= FALSE;	// No CTS output flow control
+		com_dcb.fOutxDsrFlow		= FALSE;	// No DSR output flow control
+		com_dcb.fDtrControl			= DTR_CONTROL_DISABLE;// No DTR flow control
+		com_dcb.fDsrSensitivity		= FALSE;	// DSR sensitivity 
+		com_dcb.fTXContinueOnXoff	= TRUE;		// XOFF continues Tx
+		com_dcb.fOutX				= FALSE;	// No XON/XOFF out flow control
+		com_dcb.fInX				= FALSE;	// No XON/XOFF in flow control
+		com_dcb.fErrorChar			= FALSE;	// Disable error replacement
+		com_dcb.fNull				= FALSE;	// Disable null stripping
+		com_dcb.fRtsControl			= RTS_CONTROL_DISABLE;//No RTS flow control
+		com_dcb.fAbortOnError		= FALSE;	// 当串口发生错误，并不终止串口读写 
+		com_dcb.ByteSize			= 8;		//数据位,范围:4-8 
+		com_dcb.Parity				= NOPARITY;	//校验位
+		com_dcb.StopBits			= ONESTOPBIT;     //停止位
+										   //com_dcb.fBinary = TRUE;
+										   //com_dcb.fParity = TRUE;
+	}
 
 
+	if (!SetCommState(Robocon_com, &com_dcb))
+	{
+		/*printf("Serial set fail\n");*/
+		MessageBox(hDlg, TEXT("串口配置失败\n"), MB_OK, TRUE);
+		return -1;
+	}
+	SetupComm(Robocon_com, 1024, 1024);//读写缓冲区
+
+	PurgeComm(Robocon_com, PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);//清除错误标志
+
+	memset(&tim_out, 0, sizeof(tim_out));
+	tim_out.ReadIntervalTimeout			= MAXDWORD;//读写时间间隔设置	
+	tim_out.ReadTotalTimeoutMultiplier	= 10;
+	tim_out.ReadTotalTimeoutConstant	= 0;
+	tim_out.WriteTotalTimeoutMultiplier = 50;
+	tim_out.WriteTotalTimeoutConstant	= 2000;
+	SetCommTimeouts(Robocon_com, &tim_out);
+
+
+	CreateEvent(NULL, TRUE, FALSE, NULL);
+	CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	return 1;
+}
+//串口发送函数
+DWORD Com_Send(HWND hDlg, char *p, int len)
+{
+	DWORD write_bytes = len;
+	COMSTAT comstate;
+	DWORD dwErrorFlag;
+	BOOL writeFlag=0;
+	OVERLAPPED m_osWrite;
+	
+	DWORD error = 0;
+	m_osWrite.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);//信号状态设置
+	m_osWrite.Offset = 0;
+	m_osWrite.OffsetHigh = 0;
+
+	writeFlag = WriteFile(Robocon_com, p, write_bytes, &write_bytes, &m_osWrite);//接收
+	if (!writeFlag)
+	{
+
+		if (GetLastError() == ERROR_IO_PENDING)
+		{
+			WaitForSingleObject(m_osWrite.hEvent, 1000); //后台发送
+			return write_bytes;
+		}
+		/*printf("Write fail\n");*/
+		MessageBox(hDlg, TEXT("发送失败\n"), MB_OK, TRUE);
+		return 0;
+	}
+	return write_bytes;//写入字节数
+}
+//串口读取函数
+DWORD Com_Recv(HWND hDlg, char *p, int len)
+{
+	DWORD read_bytes = len;
+	BOOL readstate;
+	DWORD dwErrorFlag;
+	COMSTAT comstate;
+	OVERLAPPED m_osRead = { 0 };
+
+	m_osRead.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+
+	if (m_osRead.hEvent = NULL)
+		return 0;
+
+	memset(&comstate, 0, sizeof(COMSTAT));
+
+	ClearCommError(Robocon_com, &dwErrorFlag, &comstate);
+
+	if (!comstate.cbInQue)//缓冲区无数据
+		return 0;
+
+	if (read_bytes > comstate.cbInQue)//缓冲区实际数据量
+		read_bytes = comstate.cbInQue;
+
+	readstate = ReadFile(Robocon_com, p, read_bytes, &read_bytes, &m_osRead);    //读取到p
+
+	if (!readstate)
+	{
+		if (GetLastError() == ERROR_IO_PENDING)  //后台接收
+		{
+			GetOverlappedResult(Robocon_com, &m_osRead, &read_bytes, TRUE);
+			return read_bytes;//读取字节数
+		}
+
+		/*printf("Read fail\n");*/
+		MessageBox(hDlg, TEXT("Read fail\n"), MB_OK, TRUE);
+		return 0;
+	}
+	return read_bytes;
+}
+
+
+//int serial_open(LPCWSTR COMx, int BaudRate)
+//{
+//
+//	hCom = CreateFile(COMx, //COM1口    
+//		GENERIC_READ | GENERIC_WRITE, //允许读和写    
+//		0, //独占方式    
+//		NULL,
+//		OPEN_EXISTING, //打开而不是创建     
+//		0, //重叠方式FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED  (同步方式设置为0)
+//		NULL);
+//	if (hCom == INVALID_HANDLE_VALUE)
+//	{
+//		//printf("打开COM失败!\n");
+//		MessageBox(hWnd, TEXT("打开串口失败"), MB_OK, TRUE);
+//		return FALSE;
+//	}
+//	SetupComm(hCom, 1024, 1024); //输入缓冲区和输出缓冲区的大小都是1024 
+//
+//								 //设定读写超时 
+//								 /*COMMTIMEOUTS TimeOuts;
+//								 TimeOuts.ReadIntervalTimeout=1000;
+//								 TimeOuts.ReadTotalTimeoutMultiplier=500;
+//								 TimeOuts.ReadTotalTimeoutConstant=5000; //设定写超时
+//								 TimeOuts.WriteTotalTimeoutMultiplier=500;
+//								 TimeOuts.WriteTotalTimeoutConstant = 2000;
+//								 SetCommTimeouts(hCom, &TimeOuts); //设置超时
+//								 */
+//	DCB dcb;
+//	GetCommState(hCom, &dcb);
+//	dcb.BaudRate = BaudRate;        //设置波特率为BaudRate
+//	dcb.ByteSize = 4;				//每个字节有8位 
+//	dcb.Parity = NOPARITY;            //无奇偶校验位 
+//	dcb.StopBits = ONESTOPBIT;        //一个停止位
+//	SetCommState(hCom, &dcb);        //设置参数到hCom
+//	PurgeComm(hCom, PURGE_TXCLEAR | PURGE_RXCLEAR);//清空缓存区        //PURGE_TXABORT 中断所有写操作并立即返回，即使写操作还没有完成。
+//												   //PURGE_RXABORT 中断所有读操作并立即返回，即使读操作还没有完成。
+//												   //PURGE_TXCLEAR 清除输出缓冲区 
+//												   //PURGE_RXCLEAR 清除输入缓冲区  
+//	return TRUE;
+//}
 //------------------------一、WinMain入口点
 // win32项目.cpp : 定义应用程序的入口点。
 //
@@ -229,7 +404,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
-
+			case IDB_PortCtl:
+				SerailConfiguration(hWnd,message,wParam,lParam);
+				break;
+			case IDB_ClearData:
+				ClearData(hWnd, message, wParam, lParam);
+				break;
             case IDM_EXIT:
                 DestroyWindow(hWnd);	//销毁指定的窗口。这个函数通过发送WM_DESTROY 消息和 WM_NCDESTROY 消息使窗口无效并移除其键盘焦点。
 										//这个函数还销毁窗口的菜单，清空线程的消息队列，销毁与窗口过程相关的定时器，解除窗口对剪贴板的拥有权，打断剪贴板器的查看链。
@@ -243,10 +423,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         break;
 	case WM_CREATE:
 		//---------------------------------------静态字符
-		Login_Button = CreateWindow(TEXT("static"), TEXT("串口号："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 0, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("static"), TEXT("波特率："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 60, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("static"), TEXT("校验位："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 120, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("static"), TEXT("停止位："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 180, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("串口号："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 0, 80, 20, hWnd, (HMENU)IDS_COMx, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("波特率："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 60, 80, 20, hWnd, (HMENU)IDS_BaudRate, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("校验位："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 120, 80, 20, hWnd, (HMENU)奇偶校验, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("停止位："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 180, 80, 20, hWnd, (HMENU)停止位, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		
 		Login_Button = CreateWindow(TEXT("static"), TEXT("接收计数："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 280, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("static"), TEXT("发送计数："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 325, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
@@ -257,8 +437,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		Login_Button = CreateWindow(TEXT("static"), TEXT("Address2："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 200, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("static"), TEXT("Address3："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 400, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		//---------------------------------------添加按键
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开串口"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 375, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("清空数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 405, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开串口"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 375, 80, 30, hWnd, (HMENU)IDB_PortCtl, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("清空数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 405, 80, 30, hWnd, (HMENU)IDB_ClearData, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("button"), TEXT("发送数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 
 		Login_Button = CreateWindow(TEXT("button"), TEXT("打开RGB"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
@@ -271,7 +451,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		Login_Button = CreateWindow(TEXT("button"), TEXT("Hex接收"), WS_CHILD | WS_VISIBLE | BS_CHECKBOX, 700, 235, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("button"), TEXT("Hex发送"), WS_CHILD | WS_VISIBLE | BS_CHECKBOX, 700, 255, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		//---------------------------------------下拉列表
-		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("串口号"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 30, 80, 100, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("串口号"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 30, 80, 100, hWnd, (HMENU)IDC_COMx, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		for (int i = 0; i <= 16; i++)
 		{
 			wchar_t str[80];
@@ -283,7 +463,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		}
 		SendMessage(Login_Button, CB_SETCURSEL, 2, 0);//设置默认值
 
-		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("波特率"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 90, 80, 100, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("波特率"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 90, 80, 100, hWnd, (HMENU)IDB_BaudRate, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("1200"));
 		SendMessage(Login_Button, CB_ADDSTRING, 1, (LPARAM)TEXT("2400"));
 		SendMessage(Login_Button, CB_ADDSTRING, 2, (LPARAM)TEXT("4800"));
@@ -353,11 +533,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		
 
 		//---------------------------------------显示框
-		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/| ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/| ES_READONLY/*只读*/, 0, 0, 695, 200, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/ | ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/ /*| ES_READONLY只读*/, 0, 205, 695, 200, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/| ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/| ES_READONLY/*只读*/, 0, 0, 695, 200, hWnd, (HMENU)IDE_Receive, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/ | ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/ /*| ES_READONLY只读*/, 0, 205, 695, 200, hWnd, (HMENU)IDE_Send, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 
-		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收计数"), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_READONLY/*只读*/, 700, 300, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送计数"), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/  | ES_READONLY/*只读*/, 700, 345, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收计数"), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_READONLY/*只读*/, 700, 300, 80, 20, hWnd, (HMENU)IDS_ReceiveCount, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送计数"), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/  | ES_READONLY/*只读*/, 700, 345, 80, 20, hWnd, (HMENU)IDS_SendCount, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		break;
     case WM_PAINT:
         {
@@ -402,4 +582,107 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     }
     return (INT_PTR)FALSE;
+}
+// “打开串口”框的消息处理程序。
+INT_PTR CALLBACK SerailConfiguration(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		return (INT_PTR)TRUE;
+
+	case WM_COMMAND:
+		if (LOWORD(wParam) == IDB_PortCtl)
+		{
+			static char portflag = 0;
+			//MessageBox(hDlg, TEXT("你点击了打开串口"), TEXT("提示框名"), MB_OK);
+			//SetWindowText(hDlg, TEXT("关闭串口"));
+			//SetDlgItemText(hDlg, 打开串口, TEXT("关闭串口"));
+			if (0 == portflag)
+			{
+				//LPCWSTR COMx;
+				//TCHAR  text[20];
+				//HWND hCombox;
+				//int BaudRate;
+				//hCombox = GetDlgItem(hDlg, IDB_BaudRate);
+				////GetDlgItemText(combox, 串口号, text, 10);
+				//SendMessage(hCombox, CB_GETLBTEXT, 1, (LPARAM)text);
+
+				//BaudRate = (int)SendMessage(hCombox, CB_GETCURSEL, 0, 0L);
+				//BaudRate = GetDlgItemInt(hDlg, 波特率, NULL, TRUE);
+				HWND hDct;
+				LPCWSTR COMx;
+				TCHAR  text[20];
+				int BaudRate;
+				
+				//-------------------------获取相关参数
+				GetDlgItemText(hDlg, IDC_COMx, (LPWSTR)text, 10);
+				BaudRate = GetDlgItemInt(hDlg, IDB_BaudRate, NULL, false);
+				portflag = Serial_Init(hDlg, (LPWSTR)text, BaudRate);
+				if (1 == portflag)	//打开串口成功
+				{
+					//-------------------------锁定相关控件
+					hDct = GetDlgItem(hDlg, IDC_COMx);
+					EnableWindow(hDct, FALSE);
+					hDct = GetDlgItem(hDlg, IDB_BaudRate);
+					EnableWindow(hDct, FALSE);
+					//-------------------------更新控件
+					SetDlgItemText(hDlg, IDB_PortCtl, TEXT("关闭串口"));	//修改控件文字
+					SetDlgItemInt(hDlg, IDS_ReceiveCount, 0, TRUE);
+					SetDlgItemInt(hDlg, IDS_SendCount, 0, TRUE);
+					portflag = 1;
+					char p[3] = { 0x01,0x02,0x03 };
+					Com_Send(hDlg, p, 2);
+				}				
+			}
+			else
+			{				
+				if (0 == CloseHandle(Robocon_com))
+				{
+					MessageBox(hDlg, TEXT("关闭串口失败"),MB_OK,NULL);
+				}
+				else
+				{
+					HWND hDct;
+					//-------------------------解锁相关控件
+					hDct = GetDlgItem(hDlg, IDC_COMx);
+					EnableWindow(hDct, TRUE);
+					hDct = GetDlgItem(hDlg, IDB_BaudRate);
+					EnableWindow(hDct, TRUE);
+					//-------------------------更新控件
+					SetDlgItemText(hDlg, IDB_PortCtl, TEXT("打开串口"));
+					portflag = 0;
+				}				
+			}
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+		break;
+	}
+	return (INT_PTR)FALSE;
+}
+// “打开串口”框的消息处理程序。
+INT_PTR CALLBACK ClearData(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		return (INT_PTR)TRUE;
+
+	case WM_COMMAND:
+		if (LOWORD(wParam) == IDB_ClearData)
+		{
+			SetDlgItemText(hDlg, IDE_Receive, TEXT(""));
+			SetDlgItemText(hDlg, IDE_Receive, TEXT(""));
+			SetDlgItemText(hDlg, IDE_Receive, TEXT(""));
+			SetDlgItemInt(hDlg, IDS_ReceiveCount, 0, TRUE);
+			SetDlgItemInt(hDlg, IDS_SendCount, 0, TRUE);
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+		break;
+	}
+	return (INT_PTR)FALSE;
 }
