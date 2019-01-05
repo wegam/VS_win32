@@ -12,13 +12,16 @@
 #define MAX_LOADSTRING 100
 
 // 全局变量: 
+
+unsigned char rxd[60] = { 0 };
+
 HINSTANCE hInst;                                // 当前实例
 WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 
 HWND Login_Button;			//登录按钮
 HANDLE Robocon_com;
-
+HWND hWnd;
 // 此代码模块中包含的函数的前向声明: 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
@@ -26,6 +29,8 @@ LRESULT CALLBACK    WindowProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	SerailConfiguration(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK	ClearData(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK	UserProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK	dislpay(HWND hDlg, unsigned char *p, int len, char RTflag);
 
 int Serial_Init(HWND hDlg,LPCWSTR COMx, int BaudRate)
 {
@@ -86,11 +91,11 @@ int Serial_Init(HWND hDlg,LPCWSTR COMx, int BaudRate)
 
 	CreateEvent(NULL, TRUE, FALSE, NULL);
 	CreateEvent(NULL, TRUE, FALSE, NULL);
-
+	SetCommMask(Robocon_com, EV_RXCHAR);	//事件--接收到一个字节
 	return 1;
 }
 //串口发送函数
-DWORD Com_Send(HWND hDlg, char *p, int len)
+DWORD Com_Send(HWND hDlg, unsigned char *p, int len)
 {
 	DWORD write_bytes = len;
 	COMSTAT comstate;
@@ -116,10 +121,17 @@ DWORD Com_Send(HWND hDlg, char *p, int len)
 		MessageBox(hDlg, TEXT("发送失败\n"), MB_OK, TRUE);
 		return 0;
 	}
+	//----------------------更新接收计数
+	int sendcount = 0;
+	sendcount = GetDlgItemInt(hDlg, IDS_SendCount, NULL, FALSE);
+	sendcount += len;
+	SetDlgItemInt(hDlg, IDS_SendCount, sendcount, TRUE);
+	//----------------------更新接收显示
+	dislpay(hDlg, p,len, 1);
 	return write_bytes;//写入字节数
 }
 //串口读取函数
-DWORD Com_Recv(HWND hDlg, char *p, int len)
+DWORD Com_Recv(HWND hDlg, unsigned char *p, int len)
 {
 	DWORD read_bytes = len;
 	BOOL readstate;
@@ -156,9 +168,55 @@ DWORD Com_Recv(HWND hDlg, char *p, int len)
 		MessageBox(hDlg, TEXT("Read fail\n"), MB_OK, TRUE);
 		return 0;
 	}
+	//----------------------更新接收计数
+	int sendcount = 0;
+	sendcount = GetDlgItemInt(hDlg, IDS_ReceiveCount, NULL, FALSE);
+	sendcount += read_bytes;
+	SetDlgItemInt(hDlg, IDS_ReceiveCount, sendcount, TRUE);
+	//----------------------更新接收显示
+	dislpay(hDlg, p, read_bytes, 2);
 	return read_bytes;
 }
+//显示
+INT_PTR CALLBACK dislpay(HWND hDlg, unsigned char *p, int len,char RTflag)
+{
+	HWND editWindow;
+	int i = 0;
+	int j = 9;
+	int line;
 
+	wchar_t str[1024] = { 0 };
+	wchar_t* temp=str;
+	if (1 == RTflag)
+	{
+		editWindow = GetDlgItem(hDlg, IDE_Send);
+	}
+	else
+	{
+		editWindow = GetDlgItem(hDlg, IDE_Receive);
+	}
+	line = SendMessage(editWindow, EM_GETLINECOUNT, 0, 0);
+	swprintf_s(temp, 15, L"%0.8d:", line); //将x=1234输出到buffer
+
+	for (i = 0; i < len; i++)
+	{
+		unsigned char data = p[i]&0xFF;
+		temp = &str[j];
+		swprintf_s(temp, 20, L"%0.2X ", data); //将x=1234输出到buffer
+		j += 3;
+		//wprintf(temp);
+		//SetDlgItemText(hDlg, IDE_Send, (LPCWSTR)str);
+	}	
+	//-------------------------层行插入数据：每行要加入回国换行符
+	temp = &str[j];
+	swprintf_s(temp, 3, L"\r\n"); //将x=1234输出到buffer
+	//-------------------------定位光标在新行起始处
+	SendMessage(editWindow, EN_SETFOCUS, 0, 0);
+	SendMessage(editWindow, EM_SETSEL, -2, -1);
+	SendMessage(editWindow, EM_REPLACESEL, 0, (LPARAM)str);
+
+	return (INT_PTR)FALSE;
+}
 
 //int serial_open(LPCWSTR COMx, int BaudRate)
 //{
@@ -244,6 +302,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			我们的代码来处理，如果不调用这个函数，我们定义的WindowProc就永
 			远接收不到消息，你就不能做消息响应了，你的程序就只能从运行就开始死掉了，没有响应。*/
         }
+		
+		Com_Recv(hWnd, rxd, 32);
     }
 
     return (int) msg.wParam;
@@ -319,7 +379,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // 将实例句柄存储在全局变量中
-   HWND hWnd;
+   /*HWND hWnd;*/
    //--------------------------------居中
    RECT rc, rc1, rctomove;
    int width = GetSystemMetrics(SM_CXSCREEN);
@@ -393,17 +453,100 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 //
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+	int wmId = LOWORD(wParam);
+	int wmEvent = HIWORD(wParam);               // 分析菜单选择:
     switch (message)
     {
+	//case EV_RXCHAR:
+	//	char rxd[1024] = { 0 };
+	//	Com_Recv(hWnd, rxd, 10);
+	//	break;
+	case WM_LBUTTONUP:
+		switch (wmEvent)
+		{
+		case LBN_SELCHANGE:
+			switch (wmId)
+			{
+				HWND hwndList;
+			case IDL_Addr1:
+				hwndList = GetDlgItem(hWnd, IDL_Addr1);
+				SendMessage(hwndList, LB_GETCURSEL, 0, 0);
+				//SendMessage(hwndList, LB_RESETCONTENT, 5, 0);
+				break;
+			case IDL_Addr2:
+				hwndList = GetDlgItem(hWnd, IDL_Addr2);
+				SendMessage(hwndList, LB_GETCURSEL, 0, 0);
+				break;
+			case IDL_Addr3:
+				hwndList = GetDlgItem(hWnd, IDL_Addr3);
+				SendMessage(hwndList, LB_GETCURSEL, 0, 0);
+				break;
+			}
+			break;
+		case LBN_DBLCLK:
+			switch (wmId)
+			{
+			case IDL_Addr1:
+				break;
+			case IDL_Addr2:
+				break;
+			case IDL_Addr3:
+				break;
+			}
+			break;
+		}
+		break;
+
     case WM_COMMAND:	//按键消息
         {
-            int wmId = LOWORD(wParam);
+			switch (wmEvent)
+			{
+				case LBN_SELCHANGE:		//listbox
+					switch (wmId)
+					{
+						HWND hwndList;
+					case IDL_Addr1:
+						hwndList = GetDlgItem(hWnd, IDL_Addr1);
+						SendMessage(hwndList, LB_GETCURSEL, 0, 0); 
+						//SendMessage(hwndList, LB_RESETCONTENT, 5, 0);
+						break;
+					case IDL_Addr2:
+						hwndList = GetDlgItem(hWnd, IDL_Addr2);
+						SendMessage(hwndList, LB_GETCURSEL, 0, 0);
+						break;
+					case IDL_Addr3:
+						hwndList = GetDlgItem(hWnd, IDL_Addr3);
+						SendMessage(hwndList, LB_GETCURSEL, 0, 0);
+						break;
+					}
+					break;
+				case BN_CLICKED:		//checkbox
+					switch (wmId)
+					{
+						HWND hwndList;
+					case IDC_HexSend:		//hex发送
+						if (SendMessage((HWND)lParam, BM_GETCHECK, 0, 0) == TRUE)//是否打勾了
+							SendMessage((HWND)lParam, BM_SETCHECK, BST_UNCHECKED, 0);//取消打勾
+						else 
+							SendMessage((HWND)lParam, BM_SETCHECK, BST_CHECKED, 0);//打勾
+						break;
+					case IDC_HexRecv:	//hex接收
+						if (SendMessage((HWND)lParam, BM_GETCHECK, 0, 0) == TRUE)//是否打勾了
+							SendMessage((HWND)lParam, BM_SETCHECK, BST_UNCHECKED, 0);//取消打勾
+						else
+							SendMessage((HWND)lParam, BM_SETCHECK, BST_CHECKED, 0);//打勾
+						break;
+						break;
+					}
+					break;
+			}
             // 分析菜单选择: 
             switch (wmId)
             {
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
+			
 			case IDB_PortCtl:
 				SerailConfiguration(hWnd,message,wParam,lParam);
 				break;
@@ -414,13 +557,30 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
                 DestroyWindow(hWnd);	//销毁指定的窗口。这个函数通过发送WM_DESTROY 消息和 WM_NCDESTROY 消息使窗口无效并移除其键盘焦点。
 										//这个函数还销毁窗口的菜单，清空线程的消息队列，销毁与窗口过程相关的定时器，解除窗口对剪贴板的拥有权，打断剪贴板器的查看链。
                 break;
-
+			case IDB_RedCtl:
+				UserProc(hWnd, message, wParam, lParam);
+				break;
+			case IDB_GreCtl:
+				UserProc(hWnd, message, wParam, lParam);
+				break;
+			case IDB_BluCtl:
+				UserProc(hWnd, message, wParam, lParam);
+				break;
+			case IDB_RGBCtl:
+				UserProc(hWnd, message, wParam, lParam);
+				break;
+			case IDB_LockCtl:
+				UserProc(hWnd, message, wParam, lParam);
+				break;
+			case IDB_BKLigthCtl:
+				UserProc(hWnd, message, wParam, lParam);
+				break;
 
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
         }
-        break;
+        break;	
 	case WM_CREATE:
 		//---------------------------------------静态字符
 		Login_Button = CreateWindow(TEXT("static"), TEXT("串口号："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 0, 80, 20, hWnd, (HMENU)IDS_COMx, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
@@ -441,15 +601,17 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		Login_Button = CreateWindow(TEXT("button"), TEXT("清空数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 405, 80, 30, hWnd, (HMENU)IDB_ClearData, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("button"), TEXT("发送数据"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开RGB"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开红灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 100, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开黄灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 200, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开蓝灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 300, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开门锁"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 400, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("打开背光"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 500, 435, 80, 30, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开RGB"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 435, 80, 30, hWnd, (HMENU)IDB_RGBCtl, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开红灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 100, 435, 80, 30, hWnd, (HMENU)IDB_RedCtl, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开黄灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 200, 435, 80, 30, hWnd, (HMENU)IDB_GreCtl, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开蓝灯"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 300, 435, 80, 30, hWnd, (HMENU)IDB_BluCtl, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开门锁"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 400, 435, 80, 30, hWnd, (HMENU)IDB_LockCtl, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("打开背光"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 500, 435, 80, 30, hWnd, (HMENU)IDB_BKLigthCtl, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		//---------------------------------------选择框
-		Login_Button = CreateWindow(TEXT("button"), TEXT("Hex接收"), WS_CHILD | WS_VISIBLE | BS_CHECKBOX, 700, 235, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("button"), TEXT("Hex发送"), WS_CHILD | WS_VISIBLE | BS_CHECKBOX, 700, 255, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("button"), TEXT("Hex接收"), WS_CHILD | WS_VISIBLE | BS_CHECKBOX, 700, 235, 80, 20, hWnd, (HMENU)IDC_HexRecv, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		SendMessage(Login_Button, BM_SETCHECK, BST_CHECKED, 0);//打勾
+		Login_Button = CreateWindow(TEXT("button"), TEXT("Hex发送"), WS_CHILD | WS_VISIBLE | BS_CHECKBOX, 700, 255, 80, 20, hWnd, (HMENU)IDC_HexSend, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		SendMessage(Login_Button, BM_SETCHECK, BST_CHECKED, 0);//打勾
 		//---------------------------------------下拉列表
 		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("串口号"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 30, 80, 100, hWnd, (HMENU)IDC_COMx, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		for (int i = 0; i <= 16; i++)
@@ -493,7 +655,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		
 
 		//---------------------------------------下拉列表Address1
-		Login_Button = CreateWindow(TEXT("Listbox"), TEXT("Address1"), WS_CHILD |  WS_VSCROLL|WS_BORDER | WS_VISIBLE | LBS_HASSTRINGS | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 100, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("Listbox"), TEXT("Address1"), WS_CHILD |  WS_VSCROLL|WS_BORDER | WS_VISIBLE | LBS_HASSTRINGS | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 100, 410, 80, 20, hWnd, (HMENU)IDL_Addr1, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		wchar_t str[80];
 		for (int i = 0; i <= 16; i++)
 		{
@@ -501,12 +663,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			//itoa(i, str,10);
 			swprintf_s(str,4,L"%d", i); //将x=1234输出到buffer
 			wprintf(str);
-			SendMessage(Login_Button, LB_ADDSTRING, i, (LPARAM)(str));			
+			SendMessage(Login_Button, LB_ADDSTRING, i, (LPARAM)(str));	
+			SendMessage(Login_Button, CB_SETCURSEL, 1, 0);//设置默认值
 		}
-		SendMessage(Login_Button, LB_ADDSTRING, 17, (LPARAM)(TEXT("0xFF")));
-		SendMessage(Login_Button, LB_SETCURSEL, (WPARAM)0, 0);
+		SendMessage(Login_Button, LB_ADDSTRING, 17, (LPARAM)(TEXT("All")));
+		SendMessage(Login_Button, LB_SETCURSEL, (WPARAM)2, 0);
 		//---------------------------------------下拉列表Address2
-		Login_Button = CreateWindow(TEXT("Listbox"), TEXT("Address2"), WS_CHILD | WS_VSCROLL | WS_BORDER | WS_VISIBLE | LBS_HASSTRINGS | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 300, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("Listbox"), TEXT("Address2"), WS_CHILD | WS_VSCROLL | WS_BORDER | WS_VISIBLE | LBS_HASSTRINGS | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 300, 410, 80, 20, hWnd, (HMENU)IDL_Addr2, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		for (int i = 0; i <= 16; i++)
 		{
 			//sprintf(str, "%x", i); //将10.8转为字符串
@@ -515,10 +678,10 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			wprintf(str);
 			SendMessage(Login_Button, LB_ADDSTRING, i, (LPARAM)(str));
 		}
-		SendMessage(Login_Button, LB_ADDSTRING, 17, (LPARAM)(TEXT("0xFF")));
+		SendMessage(Login_Button, LB_ADDSTRING, 17, (LPARAM)(TEXT("All")));
 		SendMessage(Login_Button, LB_SETCURSEL, (WPARAM)0, 0);
 		//---------------------------------------下拉列表Address3
-		Login_Button = CreateWindow(TEXT("Listbox"), TEXT("Address3"), WS_CHILD | WS_VSCROLL | WS_BORDER | WS_VISIBLE | LBS_HASSTRINGS | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 500, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("Listbox"), TEXT("Address3"), WS_CHILD | WS_VSCROLL | WS_BORDER | WS_VISIBLE | LBS_HASSTRINGS | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT, 500, 410, 80, 20, hWnd, (HMENU)IDL_Addr3, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		for (int i = 0; i <= 16; i++)
 		{
 			//sprintf(str, "%x", i); //将10.8转为字符串
@@ -527,16 +690,14 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			wprintf(str);
 			SendMessage(Login_Button, LB_ADDSTRING, i, (LPARAM)(str));
 		}
-		SendMessage(Login_Button, LB_ADDSTRING, 17, (LPARAM)(TEXT("0xFF")));
+		SendMessage(Login_Button, LB_ADDSTRING, 17, (LPARAM)(TEXT("All")));
 		SendMessage(Login_Button, LB_SETCURSEL, (WPARAM)0, 0);
 
-		
-
 		//---------------------------------------显示框
-		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/| ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/| ES_READONLY/*只读*/, 0, 0, 695, 200, hWnd, (HMENU)IDE_Receive, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/ | ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/ /*| ES_READONLY只读*/, 0, 205, 695, 200, hWnd, (HMENU)IDE_Send, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/| ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/| ES_READONLY/*只读*/| ES_WANTRETURN/*支持回车换行*/, 0, 0, 695, 300, hWnd, (HMENU)IDE_Receive, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送区："), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_AUTOHSCROLL /*水平滚动*/ | ES_AUTOVSCROLL /*垂直滚动*/ | ES_MULTILINE/*多行*/ | WS_VSCROLL/*垂直滚动条*/ | WS_HSCROLL/*垂直滚动条*/ /*| ES_READONLY只读*/ | ES_WANTRETURN/*支持回车换行*/, 0, 305, 695, 100, hWnd, (HMENU)IDE_Send, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 
-		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收计数"), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_READONLY/*只读*/, 700, 300, 80, 20, hWnd, (HMENU)IDS_ReceiveCount, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("edit"), TEXT("接收计数"), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/ | ES_READONLY/*只读*/ , 700, 300, 80, 20, hWnd, (HMENU)IDS_ReceiveCount, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("edit"), TEXT("发送计数"), WS_CHILD | WS_VISIBLE | WS_BORDER /*边框*/  | ES_READONLY/*只读*/, 700, 345, 80, 20, hWnd, (HMENU)IDS_SendCount, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		break;
     case WM_PAINT:
@@ -612,7 +773,7 @@ INT_PTR CALLBACK SerailConfiguration(HWND hDlg, UINT message, WPARAM wParam, LPA
 				//BaudRate = (int)SendMessage(hCombox, CB_GETCURSEL, 0, 0L);
 				//BaudRate = GetDlgItemInt(hDlg, 波特率, NULL, TRUE);
 				HWND hDct;
-				LPCWSTR COMx;
+				//LPCWSTR COMx;
 				TCHAR  text[20];
 				int BaudRate;
 				
@@ -632,8 +793,6 @@ INT_PTR CALLBACK SerailConfiguration(HWND hDlg, UINT message, WPARAM wParam, LPA
 					SetDlgItemInt(hDlg, IDS_ReceiveCount, 0, TRUE);
 					SetDlgItemInt(hDlg, IDS_SendCount, 0, TRUE);
 					portflag = 1;
-					char p[3] = { 0x01,0x02,0x03 };
-					Com_Send(hDlg, p, 2);
 				}				
 			}
 			else
@@ -662,7 +821,7 @@ INT_PTR CALLBACK SerailConfiguration(HWND hDlg, UINT message, WPARAM wParam, LPA
 	}
 	return (INT_PTR)FALSE;
 }
-// “打开串口”框的消息处理程序。
+// “清除数据”框的消息处理程序。
 INT_PTR CALLBACK ClearData(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
@@ -681,6 +840,119 @@ INT_PTR CALLBACK ClearData(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 			SetDlgItemInt(hDlg, IDS_SendCount, 0, TRUE);
 			EndDialog(hDlg, LOWORD(wParam));
 			return (INT_PTR)TRUE;
+		}
+		break;
+	}
+	return (INT_PTR)FALSE;
+}
+// “按键处理”框的消息处理程序。
+INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		return (INT_PTR)TRUE;
+
+	case WM_COMMAND:
+		HWND hDct;
+		
+		int wmId = LOWORD(wParam);
+		unsigned char TxdBuffer[32] = { 0x7E,0x07,0x02 };
+		char sendlen = 12;
+		
+		switch (wmId)
+		{			
+		case IDB_ClearData:
+				SetDlgItemText(hDlg, IDE_Receive, TEXT(""));
+				SetDlgItemText(hDlg, IDE_Receive, TEXT(""));
+				SetDlgItemText(hDlg, IDE_Receive, TEXT(""));
+				SetDlgItemInt(hDlg, IDS_ReceiveCount, 0, TRUE);
+				SetDlgItemInt(hDlg, IDS_SendCount, 0, TRUE);
+				EndDialog(hDlg, LOWORD(wParam));
+				return (INT_PTR)TRUE;
+			case IDB_RedCtl:
+				TxdBuffer[6] = 0x01;
+				TxdBuffer[7] = 0x00;
+				TxdBuffer[8] = 0x00;				
+				goto sendData;
+			case IDB_GreCtl:
+				TxdBuffer[6] = 0x00;
+				TxdBuffer[7] = 0x01;
+				TxdBuffer[8] = 0x00;
+				goto sendData;
+			case IDB_BluCtl:
+				TxdBuffer[6] = 0x00;
+				TxdBuffer[7] = 0x00;
+				TxdBuffer[8] = 0x01;
+				goto sendData;
+			case IDB_RGBCtl:
+				TxdBuffer[6] = 0x01;
+				TxdBuffer[7] = 0x01;
+				TxdBuffer[8] = 0x01;
+
+			sendData:
+				hDct = GetDlgItem(hDlg, IDL_Addr1);
+				wchar_t text[128] = { 0xFF };
+				char address1 = (char)SendMessage(hDct, LB_GETCURSEL, 0, 0);//柜地址
+				text[2] = 0;
+				SendMessage(hDct, LB_GETTEXT, (WPARAM)address1, (LPARAM)text);
+				if (0==text[2])
+				{
+					address1 = atoi((char*)&text[0]);
+					if (0 != text[1])
+					{
+						address1= address1*10+ atoi((char*)&text[1]);
+					}
+				}
+				else
+				{
+					address1 = 0xFF;
+				}
+				//GetWindowText(hDct, text, 20);
+				hDct = GetDlgItem(hDlg, IDL_Addr2);
+				text[2] = 0;
+				char address2 = (char)SendMessage(hDct, LB_GETCURSEL, 0, 0);;//层地址
+				SendMessage(hDct, LB_GETTEXT, (WPARAM)address2, (LPARAM)text);
+				if (0 == text[2])
+				{
+					address2 = atoi((char*)&text[0]);
+					if (0 != text[1])
+					{
+						address2 = address2 * 10 + atoi((char*)&text[1]);
+					}
+				}
+				else
+				{
+					address2 = 0xFF;
+				}
+				hDct = GetDlgItem(hDlg, IDL_Addr3);
+				text[2] = 0;
+				char address3 = (char)SendMessage(hDct, LB_GETCURSEL, 0, 0);;//位地址
+				SendMessage(hDct, LB_GETTEXT, (WPARAM)address3, (LPARAM)text);
+				if (0 == text[2])
+				{
+					address3 = atoi((char*)&text[0]);
+					if (0 != text[1])
+					{
+						address3 = address3 * 10 + atoi((char*)&text[1]);
+					}
+				}
+				else
+				{
+					address3 = 0xFF;
+				}
+
+
+				TxdBuffer[3] = address1;
+				TxdBuffer[4] = address2;
+				TxdBuffer[5] = address3;
+				TxdBuffer[11] = 0x7F;
+
+				Com_Send(hDlg, TxdBuffer, sendlen);
+				
+				return (INT_PTR)TRUE;
+				//itoa
 		}
 		break;
 	}
