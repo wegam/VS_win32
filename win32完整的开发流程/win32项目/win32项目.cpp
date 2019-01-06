@@ -1256,6 +1256,10 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		unsigned char TxdBuffer[32] = { 0x7E,0x07,0x02 };
 		char sendlen = 12;
 		wchar_t	text[50] = { 0 };
+		char address1 = GetListBoxdData(hDlg, IDL_Addr1);
+		char address2 = GetListBoxdData(hDlg, IDL_Addr2);
+		char address3 = GetListBoxdData(hDlg, IDL_Addr3);
+
 		switch (wmId)
 		{			
 		case IDB_ClearData:
@@ -1286,7 +1290,30 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				SetDlgItemText(hDlg, IDB_LayPower, TEXT("打开供电"));
 			}
 			goto sendData;
-	
+		case IDB_BKLigthCtl:
+			GetDlgItemText(hDlg, IDB_BKLigthCtl, text, 6);
+			if (0 == memcmp(TEXT("打开背光"), text, 6))	//获取控件字符
+			{
+				TxdBuffer[2] = 0x02;
+				TxdBuffer[6] = 0x01;
+				TxdBuffer[7] = 0x00;
+				TxdBuffer[8] = 0x00;
+				address2 = 0;
+				address3 = 0;
+				SetDlgItemText(hDlg, IDB_BKLigthCtl, TEXT("关闭背光"));
+
+			}
+			else
+			{
+				TxdBuffer[2] = 0x02;
+				TxdBuffer[6] = 0x00;
+				TxdBuffer[7] = 0x00;
+				TxdBuffer[8] = 0x00;
+				address2 = 0;
+				address3 = 0;
+				SetDlgItemText(hDlg, IDB_BKLigthCtl, TEXT("打开背光"));
+			}
+			goto sendData;
 			case IDB_RedCtl:
 				GetDlgItemText(hDlg, IDB_RedCtl, text, 6);
 				if (0 == memcmp(TEXT("打开红灯"), text, 6))	//获取控件字符
@@ -1383,9 +1410,7 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			
 			sendData:
 
-				char address1 = GetListBoxdData(hDlg, IDL_Addr1);
-				char address2 = GetListBoxdData(hDlg, IDL_Addr2);
-				char address3 = GetListBoxdData(hDlg, IDL_Addr3);
+				
 
 				TxdBuffer[3] = address1;
 				TxdBuffer[4] = address2;
@@ -1445,7 +1470,7 @@ unsigned char CheckListBoxdData(HWND hWnd)
 		SetDisableWindow(hWnd, IDB_RGBCtl);
 
 		SetDisableWindow(hWnd, IDB_LockCtl);
-		SetDisableWindow(hWnd, IDB_BKLigthCtl);
+		//SetDisableWindow(hWnd, IDB_BKLigthCtl);
 
 		SetDisableWindow(hWnd, IDB_LayPower);
 	}
@@ -1462,7 +1487,7 @@ unsigned char CheckListBoxdData(HWND hWnd)
 			SetDisableWindow(hWnd, IDB_RGBCtl);
 
 			SetEnableWindow(hWnd, IDB_LockCtl);
-			SetEnableWindow(hWnd, IDB_BKLigthCtl);
+			//SetEnableWindow(hWnd, IDB_BKLigthCtl);
 		}
 		else
 		{
@@ -1474,7 +1499,7 @@ unsigned char CheckListBoxdData(HWND hWnd)
 			SetEnableWindow(hWnd, IDB_RGBCtl);
 
 			SetDisableWindow(hWnd, IDB_LockCtl);
-			SetDisableWindow(hWnd, IDB_BKLigthCtl);
+			//SetDisableWindow(hWnd, IDB_BKLigthCtl);
 		}
 	}
 	return	1;
