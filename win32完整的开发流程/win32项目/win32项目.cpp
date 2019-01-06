@@ -13,24 +13,39 @@
 
 // 全局变量: 
 
-unsigned char rxd[60] = { 0 };
+unsigned char rxdbuffer[2048] = { 0 };
 
 HINSTANCE hInst;                                // 当前实例
 WCHAR szTitle[MAX_LOADSTRING];                  // 标题栏文本
 WCHAR szWindowClass[MAX_LOADSTRING];            // 主窗口类名
 
+//--------------------线程串口
+//原文：https ://blog.csdn.net/wowocpp/article/details/80594010
+DWORD ThreadProcWrite(LPVOID pParam);
+DWORD ThreadProcRead(LPVOID pParam);
+OVERLAPPED Wol = { 0 };
+OVERLAPPED Rol = { 0 };
+HANDLE hThreadWrite;
+HANDLE hThreadRead;
+
+ 
+
+
 HWND Login_Button;			//登录按钮
-HANDLE Robocon_com;
+HANDLE hCom;
 HWND hWnd;
 // 此代码模块中包含的函数的前向声明: 
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WindowProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK	AboutCRC16(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK	AboutProl(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK	SerailConfiguration(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK	ClearData(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK	UserProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK	dislpay(HWND hDlg, unsigned char *p, int len, char RTflag);
+unsigned short		CRC16_MODBUS(unsigned char *puchMsg, unsigned int usDataLen);
 
 int Serial_Init(HWND hDlg,LPCWSTR COMx, int BaudRate)
 {
@@ -38,15 +53,15 @@ int Serial_Init(HWND hDlg,LPCWSTR COMx, int BaudRate)
 	COMMTIMEOUTS tim_out;
 
 	//Robocon_com = CreateFile(COMx, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, NULL);
-	Robocon_com = CreateFile(COMx, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL , NULL);
-	if (Robocon_com == (HANDLE)-1)
+	hCom = CreateFile(COMx, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL , NULL);
+	if (hCom == (HANDLE)-1)
 	{
 		/*printf("Serial open fail\n");*/
 		MessageBox(hDlg, TEXT("串口打开失败\n"), MB_OK, TRUE);
 		return -1;
 	}
 
-	if (GetCommState(Robocon_com, &com_dcb))//获取COM状态，配置参数
+	if (GetCommState(hCom, &com_dcb))//获取COM状态，配置参数
 	{
 		com_dcb.BaudRate			= BaudRate;//波特率
 		com_dcb.fBinary				= TRUE;		// 设置二进制模式，此处必须设置TRUE 
@@ -70,15 +85,15 @@ int Serial_Init(HWND hDlg,LPCWSTR COMx, int BaudRate)
 	}
 
 
-	if (!SetCommState(Robocon_com, &com_dcb))
+	if (!SetCommState(hCom, &com_dcb))
 	{
 		/*printf("Serial set fail\n");*/
 		MessageBox(hDlg, TEXT("串口配置失败\n"), MB_OK, TRUE);
 		return -1;
 	}
-	SetupComm(Robocon_com, 1024, 1024);//读写缓冲区
+	SetupComm(hCom, 1024, 1024);//读写缓冲区
 
-	PurgeComm(Robocon_com, PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);//清除错误标志
+	PurgeComm(hCom, PURGE_TXABORT | PURGE_RXABORT | PURGE_TXCLEAR | PURGE_RXCLEAR);//清除错误标志
 
 	memset(&tim_out, 0, sizeof(tim_out));
 	tim_out.ReadIntervalTimeout			= MAXDWORD;//读写时间间隔设置	
@@ -86,20 +101,262 @@ int Serial_Init(HWND hDlg,LPCWSTR COMx, int BaudRate)
 	tim_out.ReadTotalTimeoutConstant	= 0;
 	tim_out.WriteTotalTimeoutMultiplier = 50;
 	tim_out.WriteTotalTimeoutConstant	= 2000;
-	SetCommTimeouts(Robocon_com, &tim_out);
+	SetCommTimeouts(hCom, &tim_out);
 
 
 	CreateEvent(NULL, TRUE, FALSE, NULL);
 	CreateEvent(NULL, TRUE, FALSE, NULL);
-	SetCommMask(Robocon_com, EV_RXCHAR);	//事件--接收到一个字节
+	SetCommMask(hCom, EV_RXCHAR);	//事件--接收到一个字节
 	return 1;
 }
+
+//https://blog.csdn.net/rabbitjerry/article/details/75384688
+DWORD WINAPI ThreadWrite(LPVOID lpParameter)//进程1
+{
+	char outputData[100] = { 0x00 };//输出数据缓存
+	if (hCom == INVALID_HANDLE_VALUE)
+	{
+		puts("打开串口失败");
+		return 0;
+	}
+	DWORD strLength = 0;
+	while (1)
+	{
+		for (int i = 0; i<100; i++)
+		{
+			outputData[i] = 0;
+		}
+		fgets(outputData, 100, stdin);     // 从控制台输入字符串
+		strLength = strlen(outputData);
+		printf("string length is %d\n", strLength);              // 打印字符串长度
+		WriteFile(hCom, outputData, strLength, &strLength, NULL); // 串口发送字符串
+		fflush(stdout);
+		PurgeComm(hCom, PURGE_TXCLEAR | PURGE_RXCLEAR);            //清空缓冲区
+		Sleep(100);
+	}
+	return 0;
+}
+
+
+
+DWORD WINAPI ThreadRead(LPVOID lpParameter)
+{
+	if (hCom == INVALID_HANDLE_VALUE)   //INVALID_HANDLE_VALUE表示出错，会设置GetLastError
+	{
+		puts("打开串口失败");
+		return 0;
+	}
+	unsigned char getputData[1024] = { 0x00 };//输入数据缓存
+									// 利用错误信息来获取进入串口缓冲区数据的字节数
+
+	DWORD dwErrors;     // 错误信息
+	COMSTAT Rcs;        // COMSTAT结构通信设备的当前信息
+	int Len = 0;
+	DWORD length = 512;               //用来接收读取的字节数
+	static	char rxdflg = 0;
+	static  int  rxdlength = 0;
+	static	int	 rxdtime = 0;
+	while (1)
+	{
+		//for (int i = 0; i<1024; i++)
+		//{
+		//	getputData[i] = 0;
+		//}
+		ClearCommError(hCom,
+			&dwErrors,
+			&Rcs);                                // 获取读缓冲区数据长度
+		Len = Rcs.cbInQue;
+		ReadFile(hCom, getputData, Len, &length, NULL);   //获取字符串
+		PurgeComm(hCom, PURGE_TXCLEAR | PURGE_RXCLEAR);  //清空缓冲区
+		if (Len>0&&Len<512)
+		{
+			int i = 0;
+			rxdflg = 1;
+			rxdtime = 0;
+			//printf("%s\n", getputData);
+			//fflush(stdout);
+			if (rxdlength + Len < 1024)
+			{
+				for (i = 0; i < Len; i++)
+				{
+					rxdbuffer[rxdlength + i] = getputData[i];
+				}
+			}
+			
+			rxdlength += Len;
+		}
+		else
+		{
+			if ((rxdtime++>3)&&(rxdflg))
+			{
+				dislpay(hWnd, rxdbuffer, rxdlength, 2);
+				rxdflg = 0;
+				rxdlength = 0;
+			}			
+		}
+		Sleep(1);
+	}
+	return 0;
+}
+
+//------------------------串口接收线程
+DWORD ThreadProcRead(LPVOID   pParam)
+{
+	BYTE    myByte[20];
+	DWORD    dwRes;
+	DWORD    dwRead;
+
+	DWORD   dwRet;
+
+	BOOL bResult;
+
+	memset(myByte, 0, sizeof(myByte));
+
+	Rol.hEvent = CreateEvent(NULL,          //创建Rol的hEvent成员为无信号状态
+		TRUE,
+		FALSE,
+		NULL);
+
+	if (Rol.hEvent == NULL)
+	{
+		printf("hEvent is Empty\r\n");
+		return -1;
+	}
+
+
+	bResult = ReadFile(hCom, //串口句柄
+		&myByte,     //存放读取数据
+		9,         //要读取的字节数
+		NULL,
+		&Rol);      //指向创建hCom时的Rol的指针
+
+	if (bResult) {
+		printf("success read out A\r\n");
+		//在这里加入处理读取数据代码,数据存放在myByte数组中          
+	}
+
+	dwRet = GetLastError();
+
+	if (!bResult && (dwRet == ERROR_IO_PENDING)) {
+
+		dwRes = WaitForSingleObject(Rol.hEvent, 5000);   //5秒超时
+
+		switch (dwRes)
+		{
+		case  WAIT_OBJECT_0:
+
+			if (!GetOverlappedResult(hCom,
+				&Rol,
+				&dwRead,    //实际读出的字节数
+				TRUE))     //TRUE表示直到操作完成函数才返回
+			{
+				//操作失败,可以使用GetLastError()获取错误信息
+			}
+			else
+			{
+				//操作成功完成,数据读取存入myByte中
+
+				//这里加入处理数据的代码
+
+				printf("success read out dwRead = %d,%s\r\n", dwRead, myByte);
+			}
+			break;
+		case   WAIT_TIMEOUT:
+			//读操作失败,原因是超时
+			printf("读操作失败,原因是超时\r\n");
+			break;
+		default:
+			//这里加入默认处理代码
+			break;
+		}
+
+	}
+
+	CloseHandle(Rol.hEvent);
+
+	return 0;
+
+}
+//------------------------串口发送线程
+DWORD ThreadProcWrite(LPVOID   pParam)
+{
+	BYTE    myByte[10] = "AT\r\n";
+
+	DWORD    dwRes;
+	DWORD    dwWrite;
+
+
+	BOOL bResult;
+
+	Wol.Internal = 0;        //设置OVERLAPPED结构Wol
+	Wol.InternalHigh = 0;
+	Wol.Offset = 0;
+	Wol.OffsetHigh = 0;
+	Wol.hEvent = CreateEvent(NULL,          //创建Wol的hEvent成员为无信号状态
+		TRUE,
+		FALSE,
+		NULL);
+
+	if (Wol.hEvent == NULL)
+	{
+		printf("hEvent 空");
+		return -1;
+	}
+
+	bResult = WriteFile(hCom,         //串口句柄
+		&myByte,     //存放待发送数据
+		4,         //欲发送的字节数
+		NULL,
+		&Wol);       //指向创建hCom时的Wol的指针
+
+	if (bResult)
+	{
+
+		printf("send success \r\n");
+
+	}
+
+	if (!bResult) {
+
+		dwRes = WaitForSingleObject(Wol.hEvent, 500);   //5ms超时
+		switch (dwRes)
+		{
+		case   WAIT_OBJECT_0:
+			if (!GetOverlappedResult(hCom,
+				&Wol,
+				&dwWrite,
+				TRUE))     //TRUE表示直到操作完成函数才返回
+			{
+				//操作失败,可以使用GetLastError()获取错误信息
+			}
+			else
+			{
+				//发送数据成功
+				printf("send success dwWrite = %d \r\n", dwWrite);
+				//这里加入发送成功的处理代码
+			}
+			break;
+		case   WAIT_TIMEOUT:
+			//读操作失败,原因是超时
+			break;
+		default:
+			//这里加入默认处理代码
+			break;
+		}
+
+	}
+
+	CloseHandle(Wol.hEvent);
+
+	return 0;
+}
+
 //串口发送函数
 DWORD Com_Send(HWND hDlg, unsigned char *p, int len)
 {
 	DWORD write_bytes = len;
-	COMSTAT comstate;
-	DWORD dwErrorFlag;
+	//COMSTAT comstate;
+	//DWORD dwErrorFlag;
 	BOOL writeFlag=0;
 	OVERLAPPED m_osWrite;
 	
@@ -108,7 +365,7 @@ DWORD Com_Send(HWND hDlg, unsigned char *p, int len)
 	m_osWrite.Offset = 0;
 	m_osWrite.OffsetHigh = 0;
 
-	writeFlag = WriteFile(Robocon_com, p, write_bytes, &write_bytes, &m_osWrite);//接收
+	writeFlag = WriteFile(hCom, p, write_bytes, &write_bytes, &m_osWrite);//接收
 	if (!writeFlag)
 	{
 
@@ -122,10 +379,10 @@ DWORD Com_Send(HWND hDlg, unsigned char *p, int len)
 		return 0;
 	}
 	//----------------------更新接收计数
-	int sendcount = 0;
+	/*int sendcount = 0;
 	sendcount = GetDlgItemInt(hDlg, IDS_SendCount, NULL, FALSE);
 	sendcount += len;
-	SetDlgItemInt(hDlg, IDS_SendCount, sendcount, TRUE);
+	SetDlgItemInt(hDlg, IDS_SendCount, sendcount, TRUE);*/
 	//----------------------更新接收显示
 	dislpay(hDlg, p,len, 1);
 	return write_bytes;//写入字节数
@@ -146,7 +403,7 @@ DWORD Com_Recv(HWND hDlg, unsigned char *p, int len)
 
 	memset(&comstate, 0, sizeof(COMSTAT));
 
-	ClearCommError(Robocon_com, &dwErrorFlag, &comstate);
+	ClearCommError(hCom, &dwErrorFlag, &comstate);
 
 	if (!comstate.cbInQue)//缓冲区无数据
 		return 0;
@@ -154,13 +411,13 @@ DWORD Com_Recv(HWND hDlg, unsigned char *p, int len)
 	if (read_bytes > comstate.cbInQue)//缓冲区实际数据量
 		read_bytes = comstate.cbInQue;
 
-	readstate = ReadFile(Robocon_com, p, read_bytes, &read_bytes, &m_osRead);    //读取到p
+	readstate = ReadFile(hCom, p, read_bytes, &read_bytes, &m_osRead);    //读取到p
 
 	if (!readstate)
 	{
 		if (GetLastError() == ERROR_IO_PENDING)  //后台接收
 		{
-			GetOverlappedResult(Robocon_com, &m_osRead, &read_bytes, TRUE);
+			GetOverlappedResult(hCom, &m_osRead, &read_bytes, TRUE);
 			return read_bytes;//读取字节数
 		}
 
@@ -169,10 +426,10 @@ DWORD Com_Recv(HWND hDlg, unsigned char *p, int len)
 		return 0;
 	}
 	//----------------------更新接收计数
-	int sendcount = 0;
-	sendcount = GetDlgItemInt(hDlg, IDS_ReceiveCount, NULL, FALSE);
-	sendcount += read_bytes;
-	SetDlgItemInt(hDlg, IDS_ReceiveCount, sendcount, TRUE);
+	//int sendcount = 0;
+	//sendcount = GetDlgItemInt(hDlg, IDS_ReceiveCount, NULL, FALSE);
+	//sendcount += read_bytes;
+	//SetDlgItemInt(hDlg, IDS_ReceiveCount, sendcount, TRUE);
 	//----------------------更新接收显示
 	dislpay(hDlg, p, read_bytes, 2);
 	return read_bytes;
@@ -207,14 +464,29 @@ INT_PTR CALLBACK dislpay(HWND hDlg, unsigned char *p, int len,char RTflag)
 		//wprintf(temp);
 		//SetDlgItemText(hDlg, IDE_Send, (LPCWSTR)str);
 	}	
-	//-------------------------层行插入数据：每行要加入回国换行符
+	//-------------------------层行插入数据：每行要加入回车换行符
 	temp = &str[j];
 	swprintf_s(temp, 3, L"\r\n"); //将x=1234输出到buffer
 	//-------------------------定位光标在新行起始处
 	SendMessage(editWindow, EN_SETFOCUS, 0, 0);
 	SendMessage(editWindow, EM_SETSEL, -2, -1);
 	SendMessage(editWindow, EM_REPLACESEL, 0, (LPARAM)str);
-
+	//----------------------更新计数
+	int sendcount = 0;
+	if (1 == RTflag)
+	{
+		sendcount = GetDlgItemInt(hDlg, IDS_SendCount, NULL, FALSE);
+		sendcount += len;
+		SetDlgItemInt(hDlg, IDS_SendCount, sendcount, TRUE);
+	}
+	else
+	{
+		sendcount = GetDlgItemInt(hDlg, IDS_ReceiveCount, NULL, FALSE);
+		sendcount += len;
+		SetDlgItemInt(hDlg, IDS_ReceiveCount, sendcount, TRUE);
+	}
+	
+	
 	return (INT_PTR)FALSE;
 }
 
@@ -281,10 +553,49 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     {
         return FALSE;
     }
+	// 线程创建
+	HANDLE HRead, HWrite;
+	HWrite = CreateThread(NULL, 0, ThreadWrite, NULL, 0, NULL);
+	HRead = CreateThread(NULL, 0, ThreadRead, NULL, 0, NULL);
+
+	//DWORD dwReadThreadID;
+	//DWORD dwReadParam;
+
+	//hThreadRead = CreateThread(NULL,
+	//	0,
+	//	(LPTHREAD_START_ROUTINE)ThreadProcRead,
+	//	&dwReadParam,
+	//	0,
+	//	&dwReadThreadID
+	//);
+
+	//if (hThreadRead == NULL) {
+
+	//	printf("Create Read Thread Fail \r\n");
+	//}
+
+
+	//DWORD dwWriteThreadID;
+	//DWORD dwWriteParam;
+
+	//hThreadWrite = CreateThread(NULL,
+	//	0,
+	//	(LPTHREAD_START_ROUTINE)ThreadProcWrite,
+	//	&dwWriteParam,
+	//	0,
+	//	&dwWriteThreadID
+	//);
+	//if (hThreadWrite == NULL) {
+
+	//	printf("Create Write Thread Fail \r\n");
+	//}
+
 
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WIN32));	//调入加速键表。该函数调入指定的加速键表。
 
     MSG msg;
+
+
 
     // 五、消息循环 
     while (GetMessage(&msg, nullptr, 0, 0))
@@ -301,11 +612,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			每收到一条消息，DispatchMessage函数负责把消息传到WindowProc让
 			我们的代码来处理，如果不调用这个函数，我们定义的WindowProc就永
 			远接收不到消息，你就不能做消息响应了，你的程序就只能从运行就开始死掉了，没有响应。*/
-        }
-		
-		Com_Recv(hWnd, rxd, 32);
+        }		
+		//Com_Recv(hWnd, rxd, 32);
     }
-
+	CloseHandle(HRead);
+	CloseHandle(HWrite);
     return (int) msg.wParam;
 }
 
@@ -457,46 +768,6 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	int wmEvent = HIWORD(wParam);               // 分析菜单选择:
     switch (message)
     {
-	//case EV_RXCHAR:
-	//	char rxd[1024] = { 0 };
-	//	Com_Recv(hWnd, rxd, 10);
-	//	break;
-	case WM_LBUTTONUP:
-		switch (wmEvent)
-		{
-		case LBN_SELCHANGE:
-			switch (wmId)
-			{
-				HWND hwndList;
-			case IDL_Addr1:
-				hwndList = GetDlgItem(hWnd, IDL_Addr1);
-				SendMessage(hwndList, LB_GETCURSEL, 0, 0);
-				//SendMessage(hwndList, LB_RESETCONTENT, 5, 0);
-				break;
-			case IDL_Addr2:
-				hwndList = GetDlgItem(hWnd, IDL_Addr2);
-				SendMessage(hwndList, LB_GETCURSEL, 0, 0);
-				break;
-			case IDL_Addr3:
-				hwndList = GetDlgItem(hWnd, IDL_Addr3);
-				SendMessage(hwndList, LB_GETCURSEL, 0, 0);
-				break;
-			}
-			break;
-		case LBN_DBLCLK:
-			switch (wmId)
-			{
-			case IDL_Addr1:
-				break;
-			case IDL_Addr2:
-				break;
-			case IDL_Addr3:
-				break;
-			}
-			break;
-		}
-		break;
-
     case WM_COMMAND:	//按键消息
         {
 			switch (wmEvent)
@@ -523,7 +794,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 				case BN_CLICKED:		//checkbox
 					switch (wmId)
 					{
-						HWND hwndList;
+						//HWND hwndList;
 					case IDC_HexSend:		//hex发送
 						if (SendMessage((HWND)lParam, BM_GETCHECK, 0, 0) == TRUE)//是否打勾了
 							SendMessage((HWND)lParam, BM_SETCHECK, BST_UNCHECKED, 0);//取消打勾
@@ -546,6 +817,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
+			case IDM_CRC16:
+				DialogBox(hInst, MAKEINTRESOURCE(IDD_CRC16), hWnd, AboutCRC16);
+				break;
+			case IDM_Prol:
+				DialogBox(hInst, MAKEINTRESOURCE(IDD_Prol), hWnd, AboutProl);
+				break;
 			
 			case IDB_PortCtl:
 				SerailConfiguration(hWnd,message,wParam,lParam);
@@ -744,6 +1021,110 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     }
     return (INT_PTR)FALSE;
 }
+// “关于CRC16”框的消息处理程序。
+INT_PTR CALLBACK AboutCRC16(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		SetDlgItemText(hDlg, IDE_CRC16,TEXT("\
+转换结果低8位在前，高8位在后			\
+\r\nvoid  InvertUint8(unsigned char *dBuf, unsigned char *srcBuf)	\
+\r\n{																\
+\r\n	int	i = 0;													\
+\r\n	unsigned char tmp[4];										\
+\r\n	tmp[0] = 0;													\
+\r\n	for (i = 0; i< 8; i++)										\
+\r\n	{															\
+\r\n		if (srcBuf[0] & (1 << i))								\
+\r\n			tmp[0] |= 1 << (7 - i);								\
+\r\n	}															\
+\r\n	dBuf[0] = tmp[0];											\
+\r\n}																\
+\r\nvoid  InvertUint16(unsigned short *dBuf, unsigned short *srcBuf)	\
+\r\n{																\
+\r\n	int	i = 0;													\
+\r\n	unsigned short tmp[4];										\
+\r\n	tmp[0] = 0;													\
+\r\n	for (i = 0; i< 16; i++)										\
+\r\n	{															\
+\r\n		if (srcBuf[0] & (1 << i))								\
+\r\n		tmp[0] |= 1 << (15 - i);								\
+\r\n	}															\
+\r\n	dBuf[0] = tmp[0];											\
+\r\n }																\
+\r\nunsigned short CRC16_MODBUS(unsigned char *puchMsg, unsigned int usDataLen)	\
+\r\n{													\
+\r\n	unsigned short wCRCin = 0xFFFF;					\
+\r\n	unsigned short wCPoly = 0x8005;					\
+\r\n	unsigned char wChar = 0;						\
+\r\n	int	i = 0;										\
+\r\n	while (usDataLen--)								\
+\r\n	{												\
+\r\n		wChar = *(puchMsg++);						\
+\r\n		InvertUint8(&wChar, &wChar);				\
+\r\n		wCRCin ^= (wChar << 8);						\
+\r\n		for (i = 0; i < 8; i++)						\
+\r\n		{											\
+\r\n			if (wCRCin & 0x8000)					\
+\r\n				wCRCin = (wCRCin << 1) ^ wCPoly;	\
+\r\n			else									\
+\r\n				wCRCin = wCRCin << 1;				\
+\r\n		}											\
+\r\n	}												\
+\r\n	InvertUint16(&wCRCin, &wCRCin);					\
+\r\n	return (wCRCin);								\
+\r\n }													\
+			"));
+		return (INT_PTR)TRUE;
+
+	case WM_COMMAND:
+		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+		{
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+		break;
+	}
+	return (INT_PTR)FALSE;
+}
+// “关于协议”框的消息处理程序。
+INT_PTR CALLBACK AboutProl(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	UNREFERENCED_PARAMETER(lParam);
+	switch (message)
+	{
+	case WM_INITDIALOG:
+		SetDlgItemText(hDlg, IDE_Prol, TEXT("\
+帧格式			\
+\r\n0x7E	:起始符	\
+\r\nmsg	:消息体\
+\r\nCRC16	:2字节校验码\
+\r\n0x7F	:结束符\
+\r\n	\
+\r\nmsg格式（消息格式)		\
+\r\nlen	:消息体长度(不含此字节)	\
+\r\ncmd	:命令号\
+\r\naddress1	:地址1\
+\r\naddress2	:地址2\
+\r\naddress3	:地址3\
+\r\ndata0	:数据0\
+\r\n~	:数据\
+\r\ndatan	:数据n\
+			"));
+		return (INT_PTR)TRUE;
+
+	case WM_COMMAND:
+		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+		{
+			EndDialog(hDlg, LOWORD(wParam));
+			return (INT_PTR)TRUE;
+		}
+		break;
+	}
+	return (INT_PTR)FALSE;
+}
 // “打开串口”框的消息处理程序。
 INT_PTR CALLBACK SerailConfiguration(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -797,7 +1178,7 @@ INT_PTR CALLBACK SerailConfiguration(HWND hDlg, UINT message, WPARAM wParam, LPA
 			}
 			else
 			{				
-				if (0 == CloseHandle(Robocon_com))
+				if (0 == CloseHandle(hCom))
 				{
 					MessageBox(hDlg, TEXT("关闭串口失败"),MB_OK,NULL);
 				}
@@ -834,7 +1215,7 @@ INT_PTR CALLBACK ClearData(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 		if (LOWORD(wParam) == IDB_ClearData)
 		{
 			SetDlgItemText(hDlg, IDE_Receive, TEXT(""));
-			SetDlgItemText(hDlg, IDE_Receive, TEXT(""));
+			SetDlgItemText(hDlg, IDE_Send, TEXT(""));
 			SetDlgItemText(hDlg, IDE_Receive, TEXT(""));
 			SetDlgItemInt(hDlg, IDS_ReceiveCount, 0, TRUE);
 			SetDlgItemInt(hDlg, IDS_SendCount, 0, TRUE);
@@ -907,7 +1288,7 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 				else
 				{
-					address1 = 0xFF;
+					address1 = (unsigned char)0xFF;
 				}
 				//GetWindowText(hDct, text, 20);
 				hDct = GetDlgItem(hDlg, IDL_Addr2);
@@ -924,7 +1305,7 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 				else
 				{
-					address2 = 0xFF;
+					address2 = (unsigned char)0xFF;
 				}
 				hDct = GetDlgItem(hDlg, IDL_Addr3);
 				text[2] = 0;
@@ -940,7 +1321,7 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				}
 				else
 				{
-					address3 = 0xFF;
+					address3 = (unsigned char)0xFF;
 				}
 
 
@@ -948,6 +1329,12 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				TxdBuffer[4] = address2;
 				TxdBuffer[5] = address3;
 				TxdBuffer[11] = 0x7F;
+
+				//-----------------------计算CRC
+				unsigned short crc16 = 0;
+				crc16 = CRC16_MODBUS(&TxdBuffer[1], TxdBuffer[1] + 1);
+				TxdBuffer[TxdBuffer[1] + 2] = crc16 & 0xFF;
+				TxdBuffer[TxdBuffer[1] + 3] = (crc16 >> 8) & 0xFF;
 
 				Com_Send(hDlg, TxdBuffer, sendlen);
 				
@@ -957,4 +1344,84 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	}
 	return (INT_PTR)FALSE;
+}
+
+
+
+
+
+/*******************************************************************************
+*函数名			:	InvertUint8
+*功能描述		:	函数功能说明
+*输入				:
+*返回值			:	无
+*修改时间		:	无
+*修改说明		:	无
+*注释				:	wegam@sina.com
+*******************************************************************************/
+void InvertUint8(unsigned char *dBuf, unsigned char *srcBuf)
+{
+	int	i = 0;
+	unsigned char tmp[4];
+	tmp[0] = 0;
+	for (i = 0; i< 8; i++)
+	{
+		if (srcBuf[0] & (1 << i))
+			tmp[0] |= 1 << (7 - i);
+	}
+	dBuf[0] = tmp[0];
+}
+/*******************************************************************************
+*函数名			:	InvertUint16
+*功能描述		:	函数功能说明
+*输入				:
+*返回值			:	无
+*修改时间		:	无
+*修改说明		:	无
+*注释				:	wegam@sina.com
+*******************************************************************************/
+void InvertUint16(unsigned short *dBuf, unsigned short *srcBuf)
+{
+	int	i = 0;
+	unsigned short tmp[4];
+	tmp[0] = 0;
+	for (i = 0; i< 16; i++)
+	{
+		if (srcBuf[0] & (1 << i))
+			tmp[0] |= 1 << (15 - i);
+	}
+	dBuf[0] = tmp[0];
+}
+/*******************************************************************************
+*函数名			:	CRC16_MODBUS
+*功能描述		:	多项式x16+x15+x5+1（0x8005），初始值0xFFFF，低位在前，高位在后，结果与0x0000异或
+*输入				:
+*返回值			:	无
+*修改时间		:	无
+*修改说明		:	无
+*注释				:	wegam@sina.com
+*******************************************************************************/
+
+unsigned short CRC16_MODBUS(unsigned char *puchMsg, unsigned int usDataLen)
+{
+	unsigned short wCRCin = 0xFFFF;
+	unsigned short wCPoly = 0x8005;
+	unsigned char wChar = 0;
+	int	i = 0;
+
+	while (usDataLen--)
+	{
+		wChar = *(puchMsg++);
+		InvertUint8(&wChar, &wChar);
+		wCRCin ^= (wChar << 8);
+		for (i = 0; i < 8; i++)
+		{
+			if (wCRCin & 0x8000)
+				wCRCin = (wCRCin << 1) ^ wCPoly;
+			else
+				wCRCin = wCRCin << 1;
+		}
+	}
+	InvertUint16(&wCRCin, &wCRCin);
+	return (wCRCin);
 }
