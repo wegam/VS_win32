@@ -901,7 +901,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		EnableWindow(Login_Button, FALSE);		//暂时禁用控件
 		//---------------------------------------下拉列表
 		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("串口号"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 30, 80, 100, hWnd, (HMENU)IDC_COMx, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
-		for (int i = 0; i <= 16; i++)
+		for (int i = 1; i <= 16; i++)
 		{
 			wchar_t str[80];
 			//sprintf(str, "%x", i); //将10.8转为字符串
@@ -910,7 +910,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 			wprintf(str);
 			SendMessage(Login_Button, CB_ADDSTRING, i, (LPARAM)(str));
 		}
-		SendMessage(Login_Button, CB_SETCURSEL, 2, 0);//设置默认值
+		SendMessage(Login_Button, CB_SETCURSEL, 1, 0);//设置默认值
 
 		Login_Button = CreateWindow(TEXT("Combobox"), TEXT("波特率"), CBS_DROPDOWNLIST | WS_CHILD | WS_VISIBLE | WS_VSCROLL, 700, 90, 80, 100, hWnd, (HMENU)IDB_BaudRate, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		SendMessage(Login_Button, CB_ADDSTRING, 0, (LPARAM)TEXT("1200"));
