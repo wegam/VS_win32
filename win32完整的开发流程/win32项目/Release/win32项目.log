@@ -1,7 +1,7 @@
 ﻿  win32项目.cpp
 win32项目.cpp(1253): warning C4101: “hDct”: 未引用的局部变量
   正在生成代码
-  4 of 31 functions (12.9%) were compiled, the rest were copied from previous compilation.
+  2 of 31 functions ( 6.5%) were compiled, the rest were copied from previous compilation.
     0 functions were new in current compilation
     1 functions had inline decision re-evaluated but remain unchanged
   已完成代码的生成

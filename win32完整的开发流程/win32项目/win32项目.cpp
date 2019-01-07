@@ -1274,12 +1274,13 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			GetDlgItemText(hDlg, IDB_LayPower, text, 6);
 			if (0 == memcmp(TEXT("打开供电"), text, 6))	//获取控件字符
 			{
-				TxdBuffer[2] = 0x05;
+				TxdBuffer[2] = 0x05;		//供电控制命令
 				TxdBuffer[6] = 0x01;
 				TxdBuffer[7] = 0x00;
 				TxdBuffer[8] = 0x00;
-				SetDlgItemText(hDlg, IDB_LayPower, TEXT("关闭供电"));
-			
+				address2 = 0;
+				address3 = 0;
+				SetDlgItemText(hDlg, IDB_LayPower, TEXT("关闭供电"));			
 			}
 			else
 			{
@@ -1287,6 +1288,8 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				TxdBuffer[6] = 0x00;
 				TxdBuffer[7] = 0x00;
 				TxdBuffer[8] = 0x00;
+				address2 = 0;
+				address3 = 0;
 				SetDlgItemText(hDlg, IDB_LayPower, TEXT("打开供电"));
 			}
 			goto sendData;
@@ -1294,7 +1297,7 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			GetDlgItemText(hDlg, IDB_BKLigthCtl, text, 6);
 			if (0 == memcmp(TEXT("打开背光"), text, 6))	//获取控件字符
 			{
-				TxdBuffer[2] = 0x02;
+				TxdBuffer[2] = 0x02;		//LED控制命令
 				TxdBuffer[6] = 0x01;
 				TxdBuffer[7] = 0x00;
 				TxdBuffer[8] = 0x00;
@@ -1313,6 +1316,17 @@ INT_PTR CALLBACK UserProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				address3 = 0;
 				SetDlgItemText(hDlg, IDB_BKLigthCtl, TEXT("打开背光"));
 			}
+			goto sendData;
+		case IDB_LockCtl:
+			GetDlgItemText(hDlg, IDB_LockCtl, text, 6);
+				TxdBuffer[2] = 0x03;			//开锁命令
+				TxdBuffer[6] = 0x01;
+				TxdBuffer[7] = 0x00;
+				TxdBuffer[8] = 0x00;
+				address2 = 0;
+				address3 = 0;
+				SetDlgItemText(hDlg, IDB_BKLigthCtl, TEXT("关闭背光"));
+				SetDlgItemText(hDlg, IDB_LayPower, TEXT("关闭供电"));
 			goto sendData;
 			case IDB_RedCtl:
 				GetDlgItemText(hDlg, IDB_RedCtl, text, 6);
@@ -1470,12 +1484,13 @@ unsigned char CheckListBoxdData(HWND hWnd)
 		SetDisableWindow(hWnd, IDB_RGBCtl);
 
 		SetDisableWindow(hWnd, IDB_LockCtl);
-		//SetDisableWindow(hWnd, IDB_BKLigthCtl);
-
+		SetDisableWindow(hWnd, IDB_BKLigthCtl);
 		SetDisableWindow(hWnd, IDB_LayPower);
 	}
 	else
 	{
+		SetEnableWindow(hWnd, IDB_LockCtl);
+		SetEnableWindow(hWnd, IDB_BKLigthCtl);
 		SetEnableWindow(hWnd, IDB_LayPower);
 		if (0 == (GetListBoxdData(hWnd, IDL_Addr2) && GetListBoxdData(hWnd, IDL_Addr3)))	//ADDR2或者ADDR3有一个为0
 		{
@@ -1485,9 +1500,6 @@ unsigned char CheckListBoxdData(HWND hWnd)
 			SetDisableWindow(hWnd, IDB_GreCtl);
 			SetDisableWindow(hWnd, IDB_BluCtl);
 			SetDisableWindow(hWnd, IDB_RGBCtl);
-
-			SetEnableWindow(hWnd, IDB_LockCtl);
-			//SetEnableWindow(hWnd, IDB_BKLigthCtl);
 		}
 		else
 		{
@@ -1497,9 +1509,6 @@ unsigned char CheckListBoxdData(HWND hWnd)
 			SetEnableWindow(hWnd, IDB_GreCtl);
 			SetEnableWindow(hWnd, IDB_BluCtl);
 			SetEnableWindow(hWnd, IDB_RGBCtl);
-
-			SetDisableWindow(hWnd, IDB_LockCtl);
-			//SetDisableWindow(hWnd, IDB_BKLigthCtl);
 		}
 	}
 	return	1;
