@@ -27,7 +27,7 @@ OVERLAPPED Wol = { 0 };
 OVERLAPPED Rol = { 0 };
 HANDLE hThreadWrite;
 HANDLE hThreadRead;
-
+DWORD Com_Send(HWND hDlg, unsigned char *p, int len);
  
 
 
@@ -50,6 +50,28 @@ unsigned char		GetListBoxdData(HWND hWnd, int nIDDlgItem);
 unsigned char		CheckListBoxdData(HWND hWnd);
 unsigned char		SetEnableWindow(HWND hWnd, int nIDDlgItem);
 unsigned char		SetDisableWindow(HWND hWnd, int nIDDlgItem);
+
+unsigned  char  ackupfarme[] =
+{
+	0x7E,
+	0x02,
+	0x81,
+	0x00,
+	0xB0,
+	0x50,
+	0x7F
+};
+unsigned  char  ackdownfarme[] =
+{
+	0x7E,
+	0x02,
+	0x01,
+	0x00,
+	0xD1,
+	0x90,
+	0x7F
+};
+
 int Serial_Init(HWND hDlg,LPCWSTR COMx, int BaudRate)
 {
 	DCB com_dcb;    //参数设置
@@ -176,23 +198,40 @@ DWORD WINAPI ThreadRead(LPVOID lpParameter)
 			int i = 0;
 			rxdflg = 1;
 			rxdtime = 0;
-			//printf("%s\n", getputData);
-			//fflush(stdout);
 			if (rxdlength + Len < 1024)
 			{
 				for (i = 0; i < Len; i++)
 				{
 					rxdbuffer[rxdlength + i] = getputData[i];
 				}
-			}
-			
-			rxdlength += Len;
+				rxdlength += Len;
+			}			
 		}
 		else
 		{
-			if ((rxdtime++>5)&&(rxdflg))
+			if ((rxdtime++>=4)&&(rxdflg))
 			{
-				dislpay(hWnd, rxdbuffer, rxdlength, 2);
+				stampphydef* phy = NULL;
+				unsigned char falg = 0;
+				wchar_t	text[500] = { 0 };
+				falg = crccheck(rxdbuffer, (unsigned short*)&rxdlength);;
+				if (falg)
+					dislpay(hWnd, rxdbuffer, rxdlength, 2);
+				else
+					goto receiveend;
+				falg= ackcheck(rxdbuffer);
+				if(1== falg)	//应答					
+				{
+					SetDlgItemText(hWnd, IDS_STATUS, TEXT("应答消息"));
+					//Com_Send(hWnd, ackdownfarme, 7);
+				}
+				else//上报消息
+				{
+					SetDlgItemText(hWnd, IDS_STATUS, TEXT("接收到数据"));
+					Com_Send(hWnd, ackdownfarme, 7);
+				}
+				receiveend:
+				rxdtime = 0;
 				rxdflg = 0;
 				rxdlength = 0;
 			}			
@@ -873,7 +912,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 		Login_Button = CreateWindow(TEXT("static"), TEXT("接收计数："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 280, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("static"), TEXT("发送计数："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 700, 325, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 
-		Login_Button = CreateWindow(TEXT("static"), TEXT("状态栏："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 470, 800, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
+		Login_Button = CreateWindow(TEXT("static"), TEXT("状态栏："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 470, 800, 20, hWnd, (HMENU)IDS_STATUS, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 
 		Login_Button = CreateWindow(TEXT("static"), TEXT("Address1："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 5, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
 		Login_Button = CreateWindow(TEXT("static"), TEXT("Address2："), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 200, 410, 80, 20, hWnd, (HMENU)IDB_BUTTON_LOGIN, ((LPCREATESTRUCT)lParam)->hInstance, NULL);
@@ -1124,6 +1163,15 @@ INT_PTR CALLBACK AboutProl(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 \r\ndata0	:数据0\
 \r\n~	:数据\
 \r\ndatan	:数据n\
+\r\n\
+\r\n\
+\r\nCMD(命令--最高位为方向0-下发，1-上传)\
+\r\n1 - 应答帧：01上对下应答，81下对上应答，数据接收正确时应答，否则发送方会重发4次\
+\r\n2 - LED控制：data1对应红色，data2对应黄色，data3对应蓝色，如果是背光控制时，address2~address3必须为0\
+\r\n3 - 开锁命令：address2~address3必须为0,data0不为0表示开锁，开锁后，背光，层板供电会自动打开\
+\r\n4 - 读卡器消息：data内容透传到终端\
+\r\n5 - 层板供电控制：address2~address3必须为0,data0不为0表示打开供电，为0表示关闭供电\
+\r\n6 - 上传状态信息：锁状态,连接状态等\
 			"));
 		return (INT_PTR)TRUE;
 
@@ -1537,7 +1585,76 @@ unsigned char SetDisableWindow(HWND hWnd, int nIDDlgItem)
 }
 
 
+/*******************************************************************************
+*函数名			:	function
+*功能描述		:	function
+*输入				:
+*返回值			:	无
+*修改时间		:	无
+*修改说明		:	无
+*注释				:	wegam@sina.com
+*******************************************************************************/
+unsigned char crccheck(unsigned char* pframe, unsigned short* length)
+{
+	unsigned  short msglen = 0;
+	unsigned  short	ValidLength = *length;
+	stampphydef* phy = NULL;
+	unsigned  short crc16=0;
+	if (NULL == pframe)
+	{
+		return 0;
+	}
+	phy = (stampphydef*)pframe;
+	//crc16 = pbuffer->
+	msglen = phy->msg.length;
+	if (2 == msglen) //应答
+	{
+		phy->crc16.crcl = pframe[4];
+		phy->crc16.crch = pframe[5];
+	}
+	else
+	{
+		if (msglen>ValidLength)     //帧长度不够
+			return  0;
+		else if (msglen>2)     //排除应答帧长度判断
+			if (msglen + 5>ValidLength) //消息帧长度不够 
+				return 0;
+		phy->crc16.crcl = pframe[msglen + 2];
+		phy->crc16.crch = pframe[msglen + 3];
+	}
+	crc16 = CRC16_MODBUS(&pframe[1], msglen + 1);
+	if (((crc16 & 0xFF) == phy->crc16.crcl) && (((crc16 >> 8) & 0xFF) == phy->crc16.crch))
+	{
+		*length = msglen + 5;
+		return 1;
+	}
+	return 0;
+}
+/*******************************************************************************
+*函数名			:	function
+*功能描述		:	检查是否为应答消息,应答消息返回1
+*输入				:
+*返回值			:	无
+*修改时间		:	无
+*修改说明		:	无
+*注释				:	wegam@sina.com
+*******************************************************************************/
+unsigned char ackcheck(unsigned char* pframe)
+{
+	unsigned  char Cmd = 0;
+	stampphydef *ampframe;
 
+	if (NULL == pframe)
+		return  0;
+
+	ampframe = (stampphydef*)pframe;
+	Cmd = (unsigned  char)ampframe->msg.cmd.cmd;
+	Cmd &= 0x3F;            //去掉高2位
+
+	if (AMPACK == Cmd)
+		return  1;        //应答消息
+	return 0;
+}
 /*******************************************************************************
 *函数名			:	InvertUint8
 *功能描述		:	函数功能说明

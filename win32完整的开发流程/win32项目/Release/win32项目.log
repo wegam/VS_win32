@@ -1,13 +1,1 @@
-﻿  win32项目.cpp
-win32项目.cpp(1253): warning C4101: “hDct”: 未引用的局部变量
-  正在生成代码
-<<<<<<< HEAD
-  2 of 31 functions ( 6.5%) were compiled, the rest were copied from previous compilation.
-=======
-  1 of 31 functions ( 3.2%) were compiled, the rest were copied from previous compilation.
->>>>>>> 8681a617ea2cc5f95a3e75a87a610d963b0a3586
-    0 functions were new in current compilation
-    1 functions had inline decision re-evaluated but remain unchanged
-  已完成代码的生成
-  win32项目.vcxproj -> D:\WOW\VS\win32\VS_win32\win32完整的开发流程\Release\win32项目.exe
-  win32项目.vcxproj -> D:\WOW\VS\win32\VS_win32\win32完整的开发流程\Release\win32项目.pdb (Full PDB)
+﻿
